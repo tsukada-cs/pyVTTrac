@@ -245,6 +245,11 @@ class VTT:
 
         Notes
         -----
+        The shapes of `tid`, `x`, `y`, `vxg`, `vyg` must be the same (`ndim` can be > 1).
+        This shape shall be expressed as sh in what follows.
+        e.g. if the shape of the input arrays are [k,l], the shapes of
+        the outputs shall be like, `count`: [k,l], `tid`: [ntrac+1,k,l]
+        
         If `asxarray` is `True`, the return values are combined into a single `xr.Dataset`.
         """
 
