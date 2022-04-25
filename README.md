@@ -1,13 +1,11 @@
 # pyVTTrac
 
-# VTTrac
-
 <!-- [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://tsukada-cs.github.io/pyVTTrac/stable)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://tsukada-cs.github.io/pyVTTrac/dev) -->
 <!-- [![Build Status](https://github.com/tsukada-cs/pyVTTrac/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/tsukada-cs/pyVTTrac/actions/workflows/CI.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/tsukada-cs/pyVTTrac/branch/main/graph/badge.svg)](https://codecov.io/gh/tsukada-cs/pyVTTrac) -->
 
-## VTTrac: Velocimetry by Template Tracking
+## pyVTTrac: Python-language implementation for Velocimetry by Template Tracking
 This library provides the python-language implementation for VTTtrac.jl (https://github.com/tsukada-cs/VTTrac.jl). It does not use module variables, so it should be good for parallel execution.
 
 The algorithm used in this library is the simple template matching of PIV (particle image velocimetry) for monochromatic image-like data, but the matching is conducted multiple times in a Lagrangian manner as in PTV (particle tracking velocimetry) over a number of times specified by the parameter named `ntrac`. The default scoring method for template matching is the cross correlation coefficient, as in the basic PIV.
