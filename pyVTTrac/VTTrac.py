@@ -35,6 +35,10 @@ class VTT:
         self.attrs["ny"] = self.o.ny
         self.attrs["nx"] = self.o.nx
         self.attrs["dtmean"] = self.o.dtmean
+        self.attrs["zmiss"] = self.o.zmiss
+        self.attrs["chk_zmiss"] = self.o.chk_zmiss
+        self.attrs["fmiss"] = self.o.fmiss
+        self.attrs["imiss"] = self.o.imiss
     
     @property
     def nt(self):
@@ -112,10 +116,6 @@ class VTT:
                 min_contrast=min_contrast, use_init_temp=use_init_temp
             )
 
-        self.attrs["zmiss"] = self.o.zmiss
-        self.attrs["chk_zmiss"] = self.o.chk_zmiss
-        self.attrs["fmiss"] = self.o.fmiss
-        self.attrs["imiss"] = self.o.imiss
         self.attrs["nsx"] = self.o.nsx
         self.attrs["nsy"] = self.o.nsy
         self.attrs["vxhw"] = self.o.vxhw
