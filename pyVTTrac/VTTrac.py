@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import julia
+julia.install()
+
 from julia.api import Julia
 jl = Julia(compiled_modules=False)
 
@@ -39,7 +42,10 @@ class VTT:
         self.attrs["chk_zmiss"] = self.o.chk_zmiss
         self.attrs["fmiss"] = self.o.fmiss
         self.attrs["imiss"] = self.o.imiss
-    
+
+    def __repr__(self):
+        return repr(self.attrs)    
+
     @property
     def nt(self):
         return self.attrs["nt"]
@@ -253,12 +259,16 @@ class VTT:
         If `asxarray` is `True`, the return values are combined into a single `xr.Dataset`.
         """
 
+        if np.isscalar(tid0):
+            tid0 = np.full(x0.shape, tid0)
+        
         # Julia is 1-origin, so +1
         tid0 = np.asarray(tid0) + 1
         x0 = np.asarray(x0) + 1
         y0 = np.asarray(y0) + 1
 
-        count, tid, x, y, vx, vy, score, zss, score_ary = Main.VTTrac.trac(self.o, tid0, x0, y0, vxg=vxg0, vyg=vyg0, out_subimage=out_subimage, out_score_ary=out_score_ary, to_missing=False)        
+        results = Main.VTTrac.trac(self.o, tid0, x0, y0, vxg=vxg0, vyg=vyg0, out_subimage=out_subimage, out_score_ary=out_score_ary, to_missing=False)
+        count, tid, x, y, vx, vy, score, zss, score_ary = results
 
         # Python is 0-origin, so -1
         tid0 -= 1
@@ -279,14 +289,20 @@ class VTT:
         vy[vy==self.fmiss] = np.nan
         score = np.array(score)
         score[score==self.fmiss] = np.nan
-        zss = np.array(zss)
-        zss[zss==self.fmiss] = np.nan
-        score_ary = np.array(score_ary)
-        score_ary[score_ary==self.fmiss] = np.nan
+        if out_subimage:
+            zss = np.array(zss)
+            zss[zss==self.fmiss] = np.nan
+        if out_score_ary:
+            score_ary = np.array(score_ary)
+            score_ary[score_ary==self.fmiss] = np.nan
 
-        if not asxarray:
+        if asxarray:
+            ds = self.to_xarray(count, tid, x, y, vx, vy, score, zss, score_ary, out_subimage=out_subimage, out_score_ary=out_score_ary)
+            return ds
+        else:
             return count, tid, x, y, vx, vy, score, zss, score_ary
 
+    def to_xarray(self, count, tid, x, y, vx, vy, score, zss=None, score_ary=None, out_subimage=False, out_score_ary=False):
         sh = count.shape
         dims = [None]*len(sh)
         dimnames = [""]*len(sh)
@@ -295,19 +311,19 @@ class VTT:
             dimnames[i] = f"n{i}"
         ds = xr.Dataset(
             data_vars=dict(
-                z = (["it", "iy", "ix"], self.o.z),
-                t = (["it"], self.o.t),
+                z = (["t", "y", "x"], self.o.z),
                 count = (dimnames, count),
                 tid = (["it", *dimnames], tid),
                 xloc = (["it", *dimnames], x),
                 yloc = (["it", *dimnames], y),
-                vx = (["it_v", *dimnames], vx),
-                vy = (["it_v", *dimnames], vy),
-                score = (["it_v", *dimnames], score),
+                vx = (["ith", *dimnames], vx),
+                vy = (["ith", *dimnames], vy),
+                score = (["ith", *dimnames], score),
             ),
             coords=dict(
-                it = np.arange(self.nt),
-                it_v = np.arange(self.nt-1)+0.5
+                t = (["t"], self.o.t),
+                it = np.arange(self.ntrac+1),
+                ith = np.arange(self.ntrac)+0.5
             )
         )
         if out_subimage:
@@ -315,10 +331,48 @@ class VTT:
             ds["zss"] = (["sx", "sy", "it", *dimnames], zss)
         if out_score_ary:
             ds = ds.assign_coords({"scx":np.arange(self.ixhw*2 + 1), "scy": np.arange(self.iyhw*2 + 1)})
-            ds["score_ary"] = (["scx", "scy", "it_v", *dimnames], score_ary)
+            ds["score_ary"] = (["scx", "scy", "ith", *dimnames], score_ary)
         
         ds.attrs = self.attrs
-
         return ds
-        
-    
+
+    def set_grid_par(self, x0, y0, dx, dy, ucfact, ucufact):
+        self.x0 = x0
+        self.y0 = y0
+        self.dx = abs(dx)
+        self.dy = abs(dy)
+        self.ucfact = ucfact
+        self.ucufact = ucufact
+
+    def setup_eq_grid(self, **kwargs):
+        for key in ("vxhw", "vxch"):
+            if kwargs[key]:
+                if self.ucfact:
+                    kwargs[key] = kwargs[key] / (self.dx*self.ucfact)
+                else:
+                    kwargs[key] = kwargs[key] / self.dx
+        for key in ("vyhw", "vych"):
+            if kwargs[key]:
+                if self.ucfact:
+                    kwargs[key] = kwargs[key] / (self.dy*self.ucfact)
+                else:
+                    kwargs[key] = kwargs[key] / self.dy
+        self.setup(**kwargs)
+
+    def trac_eq_grid(self, tid0, x, y, **opts):
+        x = (x-self.x0)/self.dx
+        y = (y-self.y0)/self.dy
+
+        opts["asxarray"] = False
+        count, tid, x, y, vx, vy, score, zss, score_ary = self.trac(tid0, x, y, **opts)
+
+        x = x * self.dx + self.x0
+        y = y * self.dy + self.y0
+        if self.ucfact is None:
+            vx = vx*self.dx
+            vy = vy*self.dy
+        else:
+            vx = vx * (self.ucfact*self.dx)
+            vy = vy * (self.ucfact*self.dy)
+        ds = self.to_xarray(count, tid, x, y, vx, vy, score, zss, score_ary)
+        return ds
