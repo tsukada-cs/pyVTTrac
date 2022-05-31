@@ -58,6 +58,10 @@ class VTT:
     @property
     def dtmean(self):
         return self.attrs["dtmean"]
+    
+    def __setitem__(self, key, value):
+        self.attrs[key] = value
+        exec(f"Main.VTTrac.set_{key}(self.o, value)")
 
     def setup(self, nsx, nsy, vxhw=None, vyhw=None, ixhw=None, iyhw=None, subgrid=True, subgrid_gaus=False,
         itstep=1, ntrac=2, score_method="xcor", score_th0=0.8, score_th1=0.7, vxch=None, vych=None,
