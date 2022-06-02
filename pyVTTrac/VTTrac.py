@@ -317,25 +317,25 @@ class VTT:
             data_vars=dict(
                 z = (["t", "y", "x"], self.o.z),
                 count = (dimnames, count),
-                tid = (["it", *dimnames], tid),
-                xloc = (["it", *dimnames], x),
-                yloc = (["it", *dimnames], y),
-                vx = (["ith", *dimnames], vx),
-                vy = (["ith", *dimnames], vy),
-                score = (["ith", *dimnames], score),
+                tid = (["it_rel", *dimnames], tid),
+                xloc = (["it_rel", *dimnames], x),
+                yloc = (["it_rel", *dimnames], y),
+                vx = (["it_rel_v", *dimnames], vx),
+                vy = (["it_rel_v", *dimnames], vy),
+                score = (["it_rel_v", *dimnames], score),
             ),
-            coords=dict(
-                t = (["t"], self.o.t),
-                it = np.arange(self.ntrac+1),
-                ith = np.arange(self.ntrac)+0.5
-            )
+            coords={
+                "t": (["t"], self.o.t),
+                "it_rel": np.arange(self.ntrac+1)*self.itstep,
+                "it_rel_v": np.arange(self.ntrac)*self.itstep + 0.5*np.sign(self.itstep)
+            }
         )
         if out_subimage:
             ds = ds.assign_coords({"sx":np.arange(self.nsx), "sy": np.arange(self.nsy)})
-            ds["zss"] = (["sx", "sy", "it", *dimnames], zss)
+            ds["zss"] = (["sx", "sy", "it_rel", *dimnames], zss)
         if out_score_ary:
             ds = ds.assign_coords({"scx":np.arange(self.ixhw*2 + 1), "scy": np.arange(self.iyhw*2 + 1)})
-            ds["score_ary"] = (["scx", "scy", "ith", *dimnames], score_ary)
+            ds["score_ary"] = (["scx", "scy", "it_rel_v", *dimnames], score_ary)
         
         ds.attrs = self.attrs
         return ds
