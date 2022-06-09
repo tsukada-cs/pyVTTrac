@@ -266,7 +266,7 @@ class VTT:
         if np.isscalar(tid0):
             tid0 = np.full(x0.shape, tid0)
         
-        # Julia is 1-origin, so +1
+        # Julia is 1-based, so +1
         tid0 = np.asarray(tid0) + 1
         x0 = np.asarray(x0) + 1
         y0 = np.asarray(y0) + 1
@@ -274,10 +274,10 @@ class VTT:
         results = Main.VTTrac.trac(self.o, tid0, x0, y0, vxg=vxg0, vyg=vyg0, out_subimage=out_subimage, out_score_ary=out_score_ary, to_missing=False)
         count, status, tid, x, y, vx, vy, score, zss, score_ary = results
 
-        # Python is 0-origin, so -1
-        tid0 -= 1
-        x0 -= 1
-        y0 -= 1
+        # Python is 0-based, so -1
+        tid -= 1
+        x -= 1
+        y -= 1
 
         # assign missing value
         count = np.array(count)
