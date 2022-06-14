@@ -302,12 +302,12 @@ class VTT:
             score_ary[score_ary==self.fmiss] = np.nan
 
         if asxarray:
-            ds = self.to_xarray(count, status, tid, x, y, vx, vy, score, zss, score_ary, out_subimage=out_subimage, out_score_ary=out_score_ary)
+            ds = self.to_xarray(count, status, tid, x, y, vx, vy, score, zss, score_ary)
             return ds
         else:
             return count, status, tid, x, y, vx, vy, score, zss, score_ary
 
-    def to_xarray(self, count, status, tid, x, y, vx, vy, score, zss=None, score_ary=None, out_subimage=False, out_score_ary=False):
+    def to_xarray(self, count, status, tid, x, y, vx, vy, score, zss=None, score_ary=None):
         sh = count.shape
         dims = [None]*len(sh)
         dimnames = [""]*len(sh)
@@ -332,17 +332,35 @@ class VTT:
                 "it_rel_v": np.arange(self.ntrac)*self.itstep + 0.5*np.sign(self.itstep)
             }
         )
-        if out_subimage:
+        if zss is not None:
             ds = ds.assign_coords({"sx":np.arange(self.nsx), "sy": np.arange(self.nsy)})
             ds["zss"] = (["sx", "sy", "it_rel", *dimnames], zss)
-        if out_score_ary:
+        if score_ary is not None:
             ds = ds.assign_coords({"scx":np.arange(self.ixhw*2 + 1), "scy": np.arange(self.iyhw*2 + 1)})
             ds["score_ary"] = (["scx", "scy", "it_rel_v", *dimnames], score_ary)
         
         ds.attrs = self.attrs
         return ds
 
-    def set_grid_par(self, x0, y0, dx, dy, ucfact, ucufact):
+    def set_grid_par(self, x0, y0, dx, dy, ucfact=None, ucufact=None):
+        """
+        Setup grid parameter
+
+        Parameters
+        ----------
+        x0: int or float
+            Minimum x
+        y0: int or float
+            Minimum y
+        dx: int or float
+            Delta x
+        dy: int or float
+            Delta y
+        ucfact: int or float, optional
+            unit change factor
+        ucfact: int or float, optional
+            unit change unit factor
+        """
         self.x0 = x0
         self.y0 = y0
         self.dx = abs(dx)
@@ -351,6 +369,57 @@ class VTT:
         self.ucufact = ucufact
 
     def setup_eq_grid(self, **kwargs):
+        """
+        Setup for tracking on eq grid.
+
+        Parameters
+        ----------
+        o: VTT
+            The object.
+        nsx: int
+            Submimage x sizes.
+        nsy: int
+            Submimage y sizes.
+        vxch: float or None
+            (either `v[xy]hw` or `i[xy]hw` are MANDATORY).
+            the dimensions along which to perform the computation.
+            search velocity range half sizes to set `i[xy]hw`.
+            Seach at least to cover +-v?hw around the first guess or previous step.
+            (the result can be outside the range.)
+        vyhw: float or None
+            See `vxhw` document.
+        ixhw: int or None
+            (either `v[xy]hw` or `i[xy]hw` are MANDATORY)
+            Max displacement fro template match (can be set indirecly through `v[xy]hw`).
+        iyhw: int or None
+            See `ixhw` document.
+        subgrid: bool, default True
+            Whether to conduct subgrid tracking.
+        subgrid_gaus: bool, default True
+            Whether subgrid peak finding is by gaussian.
+        itstep: int, default 1
+            Step of `t`'s used (skip if >1).
+        ntrack: int, default 2
+            Max tracking times from initial loc.
+        score_method: str, default "xcor"`
+            `"xcor"` for cross-correlation, `"ncov"` for normalized covariance.
+        score_th0: float, default 0.8
+            The minimum score required for the 1st tracking.
+        score_th1: float, default 0.7
+            The minimum score required for subsequent tracking.
+        vxch: float, optional
+            If non-`nothing`, the max tolerant vx
+            change between two consecutive tracking.
+        vych: float, optional
+            If non-`nothing`, the max tolerant vy
+            change between two consecutive tracking.
+        peak_inside_th: float, optional
+            If non-`nothing`, an initial template is used only when it is peaked (max or min) inside,
+            exceeding the max or min along the sides by the ratio specified by its value.
+        min_contrast: float, optional
+            If non-`nothing`, an initial template is used only when 
+            it has a difference in max and min greater than its value.
+        """
         for key in ("vxhw", "vxch"):
             if kwargs[key]:
                 if self.ucfact:
@@ -366,6 +435,58 @@ class VTT:
         self.setup(**kwargs)
 
     def trac_eq_grid(self, tid0, x, y, **opts):
+        """
+        Conduct tracking on eq grid.
+
+        Parameters
+        ----------
+        tid0: array-like
+            Tracking initial time indices.
+        x0: array-like
+            Tracking initial template-center x location (index-based; non-integer for subgrid).
+        y0: array-like
+            Tracking initial template-center y location (index-based; non-integer for subgrid).
+        vxg0: array-like
+            First guess of vx (to search around it). Can be 0.
+        vyg0: array-like
+            First guess of vy (to search around it). Can be 0.
+        out_subimage: bool, default False
+            Whether output subimages.
+        out_score_ary: bool, default False
+            Whether output score arrays.
+        asxarray: bool, default True
+            Whether output as `xarray.Dataset`
+
+        Returns
+        -------
+        count: np.ndarray
+            The number of successful tracking for each initial template. Shape: [len]
+        tid: np.ndarray
+            time index of the trajectories (tid0 and subsequent ones). Shape: [ntrac+1, len]
+        x: np.ndarray
+            x locations of the trajectories (x0 and derived ones). Shape: [ntrac+1, len]
+        y: np.ndarray
+            y locations of trajectories (x0 and derived ones). Shape: [ntrac+1, len]
+        vx: np.ndarray
+            Derived x-velocity. Shape: [ntrac, len]
+        vy: np.ndarray
+            Derived y-velocity. Shape: [ntrac, len]
+        score: np.ndarray
+            Scores along the trajectory (max values, possibly at subgrid). Shape: [ntrac, len]
+        zss: np.ndarray or None
+            If `out_subimage` is `True`, the subimages along the track. Shape: [nsx, nsy, ,ntrac+1, len]
+        score_arry: np.ndarray or None
+            If `out_score_ary` is `True`, the entire scores. Shape: [(x-sliding size, y-sliding size, ntrac+1, len]
+
+        Notes
+        -----
+        The shapes of `tid`, `x`, `y`, `vxg`, `vyg` must be the same (`ndim` can be > 1).
+        This shape shall be expressed as sh in what follows.
+        e.g. if the shape of the input arrays are [k,l], the shapes of
+        the outputs shall be like, `count`: [k,l], `tid`: [ntrac+1,k,l]
+        
+        If `asxarray` is `True`, the return values are combined into a single `xr.Dataset`.
+        """
         x = (x-self.x0)/self.dx
         y = (y-self.y0)/self.dy
 
