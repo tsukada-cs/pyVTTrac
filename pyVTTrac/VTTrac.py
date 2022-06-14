@@ -333,11 +333,11 @@ class VTT:
             }
         )
         if zss is not None:
-            ds = ds.assign_coords({"sx":np.arange(self.nsx), "sy": np.arange(self.nsy)})
-            ds["zss"] = (["it_rel", "sx", "sy", *dimnames], zss)
+            ds = ds.assign_coords({"sy": np.arange(self.nsy), "sx":np.arange(self.nsx)})
+            ds["zss"] = (["it_rel", "sy", "sx", *dimnames], zss)
         if score_ary is not None:
-            ds = ds.assign_coords({"scx":np.arange(self.ixhw*2 + 1), "scy": np.arange(self.iyhw*2 + 1)})
-            ds["score_ary"] = (["it_rel_v", "scx", "scy", *dimnames], score_ary)
+            ds = ds.assign_coords({"scy": np.arange(self.iyhw*2 + 1), "scx":np.arange(self.ixhw*2 + 1)})
+            ds["score_ary"] = (["it_rel_v", "scy", "scx", *dimnames], score_ary)
         
         ds.attrs = self.attrs
         return ds
