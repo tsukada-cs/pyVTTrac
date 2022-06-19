@@ -496,8 +496,8 @@ class VTT:
         x = x * self.dx + self.x0
         y = y * self.dy + self.y0
         if self.ucfact is None:
-            vx = vx*self.dx
-            vy = vy*self.dy
+            vx = vx * self.dx
+            vy = vy * self.dy
         else:
             vx = vx * (self.ucfact*self.dx)
             vy = vy * (self.ucfact*self.dy)
