@@ -244,8 +244,6 @@ class VTT:
             x locations of the trajectories (x0 and derived ones). Shape: [ntrac+1, len]
         y: np.ndarray
             y locations of trajectories (x0 and derived ones). Shape: [ntrac+1, len]
-        ztraj: np.ndarray
-            z on the locations of trajectories. Shape: [ntrac+1, len]
         vx: np.ndarray
             Derived x-velocity. Shape: [ntrac, len]
         vy: np.ndarray
@@ -276,7 +274,7 @@ class VTT:
         y0 = np.asarray(y0) + 1
 
         results = Main.VTTrac.trac(self.o, tid0, x0, y0, vxg=vxg0, vyg=vyg0, out_subimage=out_subimage, out_score_ary=out_score_ary, to_missing=False)
-        count, status, tid, x, y, ztraj, vx, vy, score, zss, score_ary = results
+        count, status, tid, x, y, vx, vy, score, zss, score_ary = results
 
         # Python is 0-based, so -1
         tid -= 1
@@ -292,8 +290,6 @@ class VTT:
         x[x==self.fmiss] = np.nan
         y = np.array(y)
         y[y==self.fmiss] = np.nan
-        ztraj = np.array(ztraj)
-        ztraj[ztraj==self.zmiss] = np.nan
         vx = np.array(vx)
         vx[vx==self.fmiss] = np.nan
         vy = np.array(vy)
@@ -308,12 +304,12 @@ class VTT:
             score_ary[score_ary==self.fmiss] = np.nan
 
         if asxarray:
-            ds = self.to_xarray(count, status, tid, x, y, ztraj, vx, vy, score, zss, score_ary)
+            ds = self.to_xarray(count, status, tid, x, y, vx, vy, score, zss, score_ary)
             return ds
         else:
-            return count, status, tid, x, y, ztraj, vx, vy, score, zss, score_ary
+            return count, status, tid, x, y, vx, vy, score, zss, score_ary
 
-    def to_xarray(self, count, status, tid, x, y, ztraj, vx, vy, score, zss=None, score_ary=None):
+    def to_xarray(self, count, status, tid, x, y, vx, vy, score, zss=None, score_ary=None):
         sh = count.shape
         dims = [None]*len(sh)
         dimnames = [""]*len(sh)
@@ -328,7 +324,6 @@ class VTT:
                 tid = (["it_rel", *dimnames], tid),
                 xloc = (["it_rel", *dimnames], x),
                 yloc = (["it_rel", *dimnames], y),
-                ztraj = (["it_rel", *dimnames], ztraj),
                 vx = (["it_rel_v", *dimnames], vx),
                 vy = (["it_rel_v", *dimnames], vy),
                 score = (["it_rel_v", *dimnames], score),
@@ -476,8 +471,6 @@ class VTT:
             x locations of the trajectories (x0 and derived ones). Shape: [ntrac+1, len]
         y: np.ndarray
             y locations of trajectories (x0 and derived ones). Shape: [ntrac+1, len]
-        ztraj: np.ndarray
-            z on the locations of trajectories. Shape: [ntrac+1, len]
         vx: np.ndarray
             Derived x-velocity. Shape: [ntrac, len]
         vy: np.ndarray
@@ -502,7 +495,7 @@ class VTT:
         y = (y-self.y0)/self.dy
 
         opts["asxarray"] = False
-        count, status, tid, x, y, ztraj, vx, vy, score, zss, score_ary = self.trac(tid0, x, y, **opts)
+        count, status, tid, x, y, vx, vy, score, zss, score_ary = self.trac(tid0, x, y, **opts)
 
         x = x * self.dx + self.x0
         y = y * self.dy + self.y0
@@ -512,5 +505,5 @@ class VTT:
         else:
             vx = vx * (self.ucfact*self.dx)
             vy = vy * (self.ucfact*self.dy)
-        ds = self.to_xarray(count, status, tid, x, y, ztraj, vx, vy, score, zss, score_ary)
+        ds = self.to_xarray(count, status, tid, x, y, vx, vy, score, zss, score_ary)
         return ds
