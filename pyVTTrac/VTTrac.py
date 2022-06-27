@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 
 import julia
@@ -209,10 +210,21 @@ class VTT:
     def use_init_temp(self):
         return self.attrs["use_init_temp"]
     
-    def calc_ixyhw_from_v(self, vxhw, vyhw):
-        ixhw = np.ceil(abs(vxhw * self.dtmean)) + 1 # max displacement
-        iyhw = np.ceil(abs(vyhw * self.dtmean)) + 1 # +1 is margin to find peak
+    def calc_ixyhw_from_v(self, vxhw, vyhw, dt):
+        ixhw = math.ceil(abs(vxhw * dt)) + 1 # max displacement
+        iyhw = math.ceil(abs(vyhw * dt)) + 1 # +1 is margin to find peak
         return ixhw, iyhw
+
+    def calc_ixyhw_from_v_eq_grid(self, vxhw, vyhw, dt):
+        if self.ucfact:
+            vxhw = vxhw / (self.dx*self.ucfact)
+        else:
+            vxhw = vxhw / self.dx
+        if self.ucfact:
+            vyhw = vyhw / (self.dy*self.ucfact)
+        else:
+            vyhw = vyhw / self.dy
+        return self.calc_ixyhw_from_v(vxhw, vyhw, dt)
     
     def trac(self, tid0, x0, y0, vxg0=None, vyg0=None, out_subimage=False, out_score_ary=False, asxarray=True):
         """
