@@ -209,6 +209,11 @@ class VTT:
     def use_init_temp(self):
         return self.attrs["use_init_temp"]
     
+    def calc_ixyhw_from_v(self, vxhw, vyhw):
+        ixhw = np.ceil(abs(vxhw * self.dtmean)) + 1 # max displacement
+        iyhw = np.ceil(abs(vyhw * self.dtmean)) + 1 # +1 is margin to find peak
+        return ixhw, iyhw
+    
     def trac(self, tid0, x0, y0, vxg0=None, vyg0=None, out_subimage=False, out_score_ary=False, asxarray=True):
         """
         Conduct tracking.
