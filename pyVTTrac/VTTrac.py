@@ -440,13 +440,13 @@ class VTT:
             it has a difference in max and min greater than its value.
         """
         for key in ("vxhw", "vxch"):
-            if kwargs[key]:
+            if key in kwargs:
                 if self.ucfact:
                     kwargs[key] = kwargs[key] / (self.dx*self.ucfact)
                 else:
                     kwargs[key] = kwargs[key] / self.dx
         for key in ("vyhw", "vych"):
-            if kwargs[key]:
+            if key in kwargs:
                 if self.ucfact:
                     kwargs[key] = kwargs[key] / (self.dy*self.ucfact)
                 else:
