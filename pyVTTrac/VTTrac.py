@@ -88,7 +88,7 @@ class VTT:
 
     def setup(self, nsx, nsy, vxhw=None, vyhw=None, ixhw=None, iyhw=None, subgrid=True, subgrid_gaus=False,
         itstep=1, ntrac=2, score_method="xcor", score_th0=0.8, score_th1=0.7, vxch=None, vych=None,
-        peak_inside_th=None, min_contrast=None, use_init_temp=False):
+        peak_inside_th=None, min_contrast=None, use_init_temp=False, min_visible=1):
         """
         Setup for tracking.
 
@@ -139,6 +139,8 @@ class VTT:
         min_contrast: float, optional
             If non-`nothing`, an initial template is used only when 
             it has a difference in max and min greater than its value.
+        min_visible: int, default 1
+            Minimum number of visible values to calculate score when `chk_mask` is True.
         """
 
         Main.VTTrac.setup(
@@ -146,7 +148,7 @@ class VTT:
                 vxhw=vxhw, vyhw=vyhw,
                 ixhw=ixhw, iyhw=iyhw, subgrid=subgrid, subgrid_gaus=subgrid_gaus, itstep=itstep, ntrac=ntrac, score_method=score_method,
                 score_th0=score_th0, score_th1=score_th1, vxch=vxch, vych=vych, peak_inside_th=peak_inside_th,
-                min_contrast=min_contrast, use_init_temp=use_init_temp
+                min_contrast=min_contrast, use_init_temp=use_init_temp, min_visible=min_visible
             )
 
         self.attrs["nsx"] = self.o.nsx
@@ -167,6 +169,7 @@ class VTT:
         self.attrs["peak_inside_th"] = self.o.peak_inside_th
         self.attrs["min_contrast"] = self.o.min_contrast
         self.attrs["use_init_temp"] = self.o.use_init_temp
+        self.attrs["min_visible"] = self.o.min_visible
     
     @property
     def zmiss(self):
@@ -231,6 +234,9 @@ class VTT:
     @property
     def use_init_temp(self):
         return self.attrs["use_init_temp"]
+    @property
+    def min_visible(self):
+        return self.attrs["min_visible"]
     
     def calc_ixyhw_from_v(self, vxhw, vyhw, dt):
         ixhw = math.ceil(abs(vxhw * dt)) + 1 # max displacement
