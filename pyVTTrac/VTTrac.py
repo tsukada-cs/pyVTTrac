@@ -46,10 +46,10 @@ class VTT:
         self.attrs["nx"] = self.o.nx
         self.attrs["dtmean"] = self.o.dtmean
         self.attrs["zmiss"] = self.o.zmiss
-        self.attrs["chk_zmiss"] = self.o.chk_zmiss
-        self.attrs["chk_mask"] = self.o.chk_mask
         self.attrs["fmiss"] = self.o.fmiss
         self.attrs["imiss"] = self.o.imiss
+        self.attrs["chk_zmiss"] = self.o.chk_zmiss
+        self.attrs["chk_mask"] = self.o.chk_mask
 
     def __repr__(self):
         return repr(self.attrs)    
@@ -66,6 +66,21 @@ class VTT:
     @property
     def dtmean(self):
         return self.attrs["dtmean"]
+    @property
+    def zmiss(self):
+        return self.attrs["zmiss"]
+    @property
+    def fmiss(self):
+        return self.attrs["fmiss"]
+    @property
+    def imiss(self):
+        return self.attrs["imiss"]
+    @property
+    def chk_zmiss(self):
+        return self.attrs["chk_zmiss"]
+    @property
+    def chk_mask(self):
+        return self.attrs["chk_mask"]
     
     def __setitem__(self, key, value):
         self.attrs[key] = value
