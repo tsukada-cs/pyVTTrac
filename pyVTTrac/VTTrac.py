@@ -16,7 +16,7 @@ import numpy as np
 import xarray as xr
 
 class VTT:
-    def __init__(self, z, t=None, zmiss=None, fmiss=-999.0, imiss=-999):
+    def __init__(self, z, t=None, mask=None, zmiss=None, fmiss=-999.0, imiss=-999):
         """
         Object initialization (VTT)
 
@@ -28,11 +28,17 @@ class VTT:
             The "images" used for tracking.
         t: array-like or None
             Time for each image (if None, [0,1,2,..]).
+        mask: array-like or None
+            The "masks" used for masking. True positions are ignored when calculate score.
         zmiss: float
             Missing value in z (None if there is no missing).
+        fmiss: float
+            Missing float value.
+        imiss: int
+            Missing int value.
         """
         z = np.array(z, np.float32)
-        self.o = Main.VTTrac.VTT(z, t=t, zmiss=zmiss, fmiss=fmiss, imiss=imiss)
+        self.o = Main.VTTrac.VTT(z, t=t, mask=mask, zmiss=zmiss, fmiss=fmiss, imiss=imiss)
         
         self.attrs = {}
         self.attrs["nt"] = self.o.nt
@@ -41,6 +47,7 @@ class VTT:
         self.attrs["dtmean"] = self.o.dtmean
         self.attrs["zmiss"] = self.o.zmiss
         self.attrs["chk_zmiss"] = self.o.chk_zmiss
+        self.attrs["chk_mask"] = self.o.chk_mask
         self.attrs["fmiss"] = self.o.fmiss
         self.attrs["imiss"] = self.o.imiss
 
