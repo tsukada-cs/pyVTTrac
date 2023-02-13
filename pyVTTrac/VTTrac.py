@@ -389,7 +389,7 @@ class VTT:
         ds.attrs = self.attrs
         return ds
 
-    def set_grid_par(self, x0, y0, dx, dy, ucfact=None, ucufact=None):
+    def set_grid_par(self, x0, y0, dx, dy, ucfact=1, ucufact=None):
         """
         Setup grid parameter
 
@@ -469,16 +469,10 @@ class VTT:
         """
         for key in ("vxhw", "vxch"):
             if key in kwargs:
-                if self.ucfact:
-                    kwargs[key] = kwargs[key] / (self.dx*self.ucfact)
-                else:
-                    kwargs[key] = kwargs[key] / self.dx
+                kwargs[key] = kwargs[key] / (self.dx*self.ucfact)
         for key in ("vyhw", "vych"):
             if key in kwargs:
-                if self.ucfact:
-                    kwargs[key] = kwargs[key] / (self.dy*self.ucfact)
-                else:
-                    kwargs[key] = kwargs[key] / self.dy
+                kwargs[key] = kwargs[key] / (self.dy*self.ucfact)
         self.setup(**kwargs)
 
     def trac_eq_grid(self, tid0, x, y, **opts):
