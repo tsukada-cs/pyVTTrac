@@ -44,7 +44,7 @@ class VTT:
         self.attrs["nt"] = self.o.nt
         self.attrs["ny"] = self.o.ny
         self.attrs["nx"] = self.o.nx
-        self.attrs["dtmax"] = self.o.dtmax
+        self.attrs["maxdt"] = self.o.maxdt
         self.attrs["zmiss"] = self.o.zmiss
         self.attrs["fmiss"] = self.o.fmiss
         self.attrs["imiss"] = self.o.imiss
@@ -64,8 +64,8 @@ class VTT:
     def nx(self):
         return self.attrs["nx"]
     @property
-    def dtmax(self):
-        return self.attrs["dtmax"]
+    def maxdt(self):
+        return self.attrs["maxdt"]
     @property
     def zmiss(self):
         return self.attrs["zmiss"]
