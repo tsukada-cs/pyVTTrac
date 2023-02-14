@@ -44,7 +44,6 @@ class VTT:
         self.attrs["nt"] = self.o.nt
         self.attrs["ny"] = self.o.ny
         self.attrs["nx"] = self.o.nx
-        self.attrs["maxdt"] = self.o.maxdt
         self.attrs["zmiss"] = self.o.zmiss
         self.attrs["fmiss"] = self.o.fmiss
         self.attrs["imiss"] = self.o.imiss
@@ -85,6 +84,8 @@ class VTT:
     def __setitem__(self, key, value):
         self.attrs[key] = value
         exec(f"Main.VTTrac.set_{key}(self.o, value)")
+    def __getitem__(self, key):
+        return self.attrs[key]
 
     def setup(self, nsx, nsy, vxhw=None, vyhw=None, ixhw=None, iyhw=None, subgrid=True, subgrid_gaus=False,
         itstep=1, ntrac=2, score_method="xcor", score_th0=0.8, score_th1=0.7, vxch=None, vych=None, maxdt=None,
