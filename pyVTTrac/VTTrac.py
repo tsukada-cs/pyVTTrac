@@ -87,7 +87,7 @@ class VTT:
         exec(f"Main.VTTrac.set_{key}(self.o, value)")
 
     def setup(self, nsx, nsy, vxhw=None, vyhw=None, ixhw=None, iyhw=None, subgrid=True, subgrid_gaus=False,
-        itstep=1, ntrac=2, score_method="xcor", score_th0=0.8, score_th1=0.7, vxch=None, vych=None,
+        itstep=1, ntrac=2, score_method="xcor", score_th0=0.8, score_th1=0.7, vxch=None, vych=None, maxdt=None,
         peak_inside_th=None, min_contrast=None, use_init_temp=False, min_visible=1):
         """
         Setup for tracking.
@@ -133,6 +133,8 @@ class VTT:
         vych: float, optional
             If non-`nothing`, the max tolerant vy
             change between two consecutive tracking.
+        maxdt: float, optional
+            If non-`nothing`, time difference of two images is limited.
         peak_inside_th: float, optional
             If non-`nothing`, an initial template is used only when it is peaked (max or min) inside,
             exceeding the max or min along the sides by the ratio specified by its value.
@@ -147,7 +149,7 @@ class VTT:
                 self.o, nsx, nsy,
                 vxhw=vxhw, vyhw=vyhw,
                 ixhw=ixhw, iyhw=iyhw, subgrid=subgrid, subgrid_gaus=subgrid_gaus, itstep=itstep, ntrac=ntrac, score_method=score_method,
-                score_th0=score_th0, score_th1=score_th1, vxch=vxch, vych=vych, peak_inside_th=peak_inside_th,
+                score_th0=score_th0, score_th1=score_th1, vxch=vxch, vych=vych, maxdt=maxdt, peak_inside_th=peak_inside_th,
                 min_contrast=min_contrast, use_init_temp=use_init_temp, min_visible=min_visible
             )
 
@@ -166,6 +168,7 @@ class VTT:
         self.attrs["score_th1"] = self.o.score_th1
         self.attrs["vxch"] = self.o.vxch
         self.attrs["vych"] = self.o.vych
+        self.attrs["maxdt"] = self.o.maxdt
         self.attrs["peak_inside_th"] = self.o.peak_inside_th
         self.attrs["min_contrast"] = self.o.min_contrast
         self.attrs["use_init_temp"] = self.o.use_init_temp
@@ -225,6 +228,9 @@ class VTT:
     @property
     def vych(self):
         return self.attrs["vych"]
+    @property
+    def maxdt(self):
+        return self.attrs["maxdt"]
     @property
     def peak_inside_th(self):
         return self.attrs["peak_inside_th"]
@@ -460,6 +466,8 @@ class VTT:
         vych: float, optional
             If non-`nothing`, the max tolerant vy
             change between two consecutive tracking.
+        maxdt: float, optional
+            If non-`nothing`, time difference of two image is limited.
         peak_inside_th: float, optional
             If non-`nothing`, an initial template is used only when it is peaked (max or min) inside,
             exceeding the max or min along the sides by the ratio specified by its value.
