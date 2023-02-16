@@ -26,7 +26,7 @@ class TestVTTrac(unittest.TestCase):
         self.assertEqual(self.vtt.attrs["nt"], nt)
         self.assertEqual(self.vtt.attrs["ny"], ny)
         self.assertEqual(self.vtt.attrs["nx"], nx)
-        self.assertEqual(self.vtt.attrs["dtmean"], np.diff(t).mean())
+        self.assertEqual(self.vtt.attrs["dtmax"], np.diff(t).max())
         
 
         nsx = 5
