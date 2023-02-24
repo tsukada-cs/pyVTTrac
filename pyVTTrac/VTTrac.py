@@ -323,11 +323,6 @@ class VTT:
         results = Main.VTTrac.trac(self.o, tid0, x0, y0, vxg=vxg0, vyg=vyg0, out_subimage=out_subimage, out_score_ary=out_score_ary, to_missing=False)
         count, status, tid, x, y, vx, vy, score, zss, score_ary = results
 
-        # Python is 0-based, so -1
-        tid -= 1
-        x -= 1
-        y -= 1
-
         # assign missing value
         count = np.array(count)
         status = np.array(status)
@@ -349,6 +344,11 @@ class VTT:
         if out_score_ary:
             score_ary = np.array(score_ary)
             score_ary[score_ary==self.fmiss] = np.nan
+
+        # Python is 0-based, so -1
+        tid -= 1
+        x -= 1
+        y -= 1
 
         if asxarray:
             ds = self.to_xarray(count, status, tid, x, y, vx, vy, score, zss, score_ary)
@@ -546,5 +546,6 @@ class VTT:
         else:
             vx = vx * (self.ucfact*self.dx)
             vy = vy * (self.ucfact*self.dy)
+
         ds = self.to_xarray(count, status, tid, x, y, vx, vy, score, zss, score_ary)
         return ds
