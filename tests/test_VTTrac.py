@@ -26,7 +26,6 @@ class TestVTTrac(unittest.TestCase):
         self.assertEqual(self.vtt.attrs["nt"], nt)
         self.assertEqual(self.vtt.attrs["ny"], ny)
         self.assertEqual(self.vtt.attrs["nx"], nx)
-        self.assertEqual(self.vtt.attrs["dtmean"], (t[-1]-t[0])/(nt-1))
         
 
         nsx = 5
@@ -34,6 +33,7 @@ class TestVTTrac(unittest.TestCase):
         ntrac = nt-1
         self.vtt.setup(nsx, nsy, vxhw=1.8, vyhw=1.8, ntrac=ntrac)
 
+        self.assertEqual(self.vtt.attrs["dtmean"], self.vtt.attrs["itstep"]*(t[-1]-t[0])/(nt-1))
         self.assertEqual(self.vtt.attrs["nsx"], nsx)
         self.assertEqual(self.vtt.attrs["nsy"], nsy)
         self.assertEqual(self.vtt.attrs["vxhw"], 1.8)

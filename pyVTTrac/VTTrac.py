@@ -44,7 +44,6 @@ class VTT:
         self.attrs["nt"] = self.o.nt
         self.attrs["ny"] = self.o.ny
         self.attrs["nx"] = self.o.nx
-        self.attrs["dtmean"] = self.o.dtmean
         self.attrs["zmiss"] = self.o.zmiss
         self.attrs["fmiss"] = self.o.fmiss
         self.attrs["imiss"] = self.o.imiss
@@ -152,7 +151,8 @@ class VTT:
                 score_th0=score_th0, score_th1=score_th1, vxch=vxch, vych=vych, peak_inside_th=peak_inside_th,
                 min_contrast=min_contrast, use_init_temp=use_init_temp, min_visible=min_visible
             )
-
+        
+        self.attrs["dtmean"] = self.o.dtmean
         self.attrs["nsx"] = self.o.nsx
         self.attrs["nsy"] = self.o.nsy
         self.attrs["vxhw"] = self.o.vxhw
