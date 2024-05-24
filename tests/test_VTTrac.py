@@ -1,12 +1,12 @@
-import unittest
-from unittest import mock
+import pytest
 
 import numpy as np
 import xarray as xr
 
 from pyVTTrac import VTTrac
 
-class TestVTTrac(unittest.TestCase):
+
+class TestVTTrac:
     """Test the FastLineDetector class."""
     def test_VTT(self):
         nt = 20

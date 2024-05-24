@@ -23,3 +23,20 @@ Spatial coordinates are based on array indices, with the distance between adjace
 ### References
 * `VTTrac.jl` by Taiga Tsukada: https://github.com/tsukada-cs/VTTrac.jl (submodule of this module)
 * `VTTrac` by Takeshi Horinouchi: https://github.com/thorinouchi/VTTrac (`VTTrac.jl` were made as julia-language implementation for it)
+
+## Installation and Test
+### How to install
+```shell
+$ git clone --recurse-submodules https://github.com/tsukada-cs/pyVTTrac.git .
+$ cd pyVTTrac
+$ pip install .
+```
+### How to test
+```shell
+$ pip install pytest
+$ pytest -s
+```
+### How to run
+```shell
+$ python example/sample.py
+```
