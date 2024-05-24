@@ -1,7 +1,7 @@
 import juliacall
 from pathlib import Path
 path = Path(__file__).parent.parent / "VTTrac.jl/src/VTTrac.jl"
-jl = juliacall.newmodule("VTTrac")
+jl = juliacall.newmodule("pyVTTrac")
 jl.include(str(path))
 jl.eval("using VTTrac")
 
