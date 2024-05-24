@@ -1,19 +1,14 @@
-import math
+import juliacall
 from pathlib import Path
-
-import julia
-julia.install()
-
-from julia.api import Julia
-jl = Julia(compiled_modules=False)
-
-from julia import Main, Pkg
 path = Path(__file__).parent.parent / "VTTrac.jl/src/VTTrac.jl"
-Pkg.activate(str(path.parent.parent))
-Main.include(str(path))
+jl = juliacall.newmodule("VTTrac")
+jl.include(str(path))
+jl.eval("using VTTrac")
+
 
 import numpy as np
 import xarray as xr
+
 
 class VTT:
     def __init__(self, z, t=None, mask=None, zmiss=None, fmiss=-999.0, imiss=-999):
@@ -38,7 +33,7 @@ class VTT:
             Missing int value.
         """
         z = np.array(z, np.float32)
-        self.o = Main.VTTrac.VTT(z, t=t, mask=mask, zmiss=zmiss, fmiss=fmiss, imiss=imiss)
+        self.o = jl.VTTrac.VTT(z, t=t, mask=mask, zmiss=zmiss, fmiss=fmiss, imiss=imiss)
         
         self.attrs = {}
         self.attrs["nt"] = self.o.nt
@@ -83,7 +78,7 @@ class VTT:
     
     def __setitem__(self, key, value):
         self.attrs[key] = value
-        exec(f"Main.VTTrac.set_{key}(self.o, value)")
+        exec(f"jl.VTTrac.set_{key}(self.o, value)")
     def __getitem__(self, key):
         return self.attrs[key]
 
@@ -144,7 +139,7 @@ class VTT:
             Minimum number of visible values to calculate score when `chk_mask` is True.
         """
 
-        Main.VTTrac.setup(
+        jl.VTTrac.setup(
                 self.o, nsx, nsy,
                 vxhw=vxhw, vyhw=vyhw,
                 ixhw=ixhw, iyhw=iyhw, subgrid=subgrid, subgrid_gaus=subgrid_gaus, itstep=itstep, ntrac=ntrac, score_method=score_method,
@@ -320,7 +315,7 @@ class VTT:
         x0 = np.asarray(x0) + 1
         y0 = np.asarray(y0) + 1
 
-        results = Main.VTTrac.trac(self.o, tid0, x0, y0, vxg=vxg0, vyg=vyg0, out_subimage=out_subimage, out_score_ary=out_score_ary, to_missing=False)
+        results = jl.VTTrac.trac(self.o, tid0, x0, y0, vxg=vxg0, vyg=vyg0, out_subimage=out_subimage, out_score_ary=out_score_ary, to_missing=False)
         count, status, tid, x, y, vx, vy, score, zss, score_ary = results
 
         # assign missing value
