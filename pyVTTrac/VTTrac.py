@@ -83,8 +83,8 @@ class VTT:
         return self.attrs[key]
 
     def setup(self, nsx, nsy, vxhw=None, vyhw=None, ixhw=None, iyhw=None, subgrid=True, subgrid_gaus=False,
-        itstep=1, ntrac=2, score_method="xcor", score_th0=0.8, score_th1=0.7, vxch=None, vych=None, 
-        peak_inside_th=None, min_contrast=None, use_init_temp=False, min_visible=1):
+        itstep=1, ntrac=2, score_method="xcor", Sth0=0.8, Sth1=0.7, vxch=None, vych=None, 
+        peak_inside_th=None, Cth=None, use_init_temp=False, min_samples=1):
         """
         Setup for tracking.
 
@@ -119,9 +119,9 @@ class VTT:
             Max tracking times from initial loc.
         score_method: str, default "xcor"`
             `"xcor"` for cross-correlation, `"ncov"` for normalized covariance.
-        score_th0: float, default 0.8
+        Sth0: float, default 0.8
             The minimum score required for the 1st tracking.
-        score_th1: float, default 0.7
+        Sth1: float, default 0.7
             The minimum score required for subsequent tracking.
         vxch: float, optional
             If non-`nothing`, the max tolerant vx
@@ -132,10 +132,10 @@ class VTT:
         peak_inside_th: float, optional
             If non-`nothing`, an initial template is used only when it is peaked (max or min) inside,
             exceeding the max or min along the sides by the ratio specified by its value.
-        min_contrast: float, optional
+        Cth: float, optional
             If non-`nothing`, an initial template is used only when 
             it has a difference in max and min greater than its value.
-        min_visible: int, default 1
+        min_samples: int, default 1
             Minimum number of visible values to calculate score when `chk_mask` is True.
         """
 
@@ -143,8 +143,8 @@ class VTT:
                 self.o, nsx, nsy,
                 vxhw=vxhw, vyhw=vyhw,
                 ixhw=ixhw, iyhw=iyhw, subgrid=subgrid, subgrid_gaus=subgrid_gaus, itstep=itstep, ntrac=ntrac, score_method=score_method,
-                score_th0=score_th0, score_th1=score_th1, vxch=vxch, vych=vych, peak_inside_th=peak_inside_th,
-                min_contrast=min_contrast, use_init_temp=use_init_temp, min_visible=min_visible
+                Sth0=Sth0, Sth1=Sth1, vxch=vxch, vych=vych, peak_inside_th=peak_inside_th,
+                Cth=Cth, use_init_temp=use_init_temp, min_samples=min_samples
             )
         
         self.attrs["dtmean"] = self.o.dtmean
@@ -159,14 +159,14 @@ class VTT:
         self.attrs["itstep"] = self.o.itstep
         self.attrs["ntrac"] = self.o.ntrac
         self.attrs["score_method"] = self.o.score_method
-        self.attrs["score_th0"] = self.o.score_th0
-        self.attrs["score_th1"] = self.o.score_th1
+        self.attrs["Sth0"] = self.o.Sth0
+        self.attrs["Sth1"] = self.o.Sth1
         self.attrs["vxch"] = self.o.vxch
         self.attrs["vych"] = self.o.vych
         self.attrs["peak_inside_th"] = self.o.peak_inside_th
-        self.attrs["min_contrast"] = self.o.min_contrast
+        self.attrs["Cth"] = self.o.Cth
         self.attrs["use_init_temp"] = self.o.use_init_temp
-        self.attrs["min_visible"] = self.o.min_visible
+        self.attrs["min_samples"] = self.o.min_samples
     
     @property
     def zmiss(self):
@@ -211,11 +211,11 @@ class VTT:
     def score_method(self):
         return self.attrs["score_method"]
     @property
-    def score_th0(self):
-        return self.attrs["score_th0"]
+    def Sth0(self):
+        return self.attrs["Sth0"]
     @property
-    def score_th1(self):
-        return self.attrs["score_th1"]
+    def Sth1(self):
+        return self.attrs["Sth1"]
     @property
     def vxch(self):
         return self.attrs["vxch"]
@@ -226,14 +226,14 @@ class VTT:
     def peak_inside_th(self):
         return self.attrs["peak_inside_th"]
     @property
-    def min_contrast(self):
-        return self.attrs["min_contrast"]
+    def Cth(self):
+        return self.attrs["Cth"]
     @property
     def use_init_temp(self):
         return self.attrs["use_init_temp"]
     @property
-    def min_visible(self):
-        return self.attrs["min_visible"]
+    def min_samples(self):
+        return self.attrs["min_samples"]
     
     def calc_ixyhw_from_v(self, vxhw, vyhw, dt):
         ixhw = math.ceil(abs(vxhw * dt)) + 1 # max displacement
@@ -447,9 +447,9 @@ class VTT:
             Max tracking times from initial loc.
         score_method: str, default "xcor"`
             `"xcor"` for cross-correlation, `"ncov"` for normalized covariance.
-        score_th0: float, default 0.8
+        Sth0: float, default 0.8
             The minimum score required for the 1st tracking.
-        score_th1: float, default 0.7
+        Sth1: float, default 0.7
             The minimum score required for subsequent tracking.
         vxch: float, optional
             If non-`nothing`, the max tolerant vx
@@ -460,7 +460,7 @@ class VTT:
         peak_inside_th: float, optional
             If non-`nothing`, an initial template is used only when it is peaked (max or min) inside,
             exceeding the max or min along the sides by the ratio specified by its value.
-        min_contrast: float, optional
+        Cth: float, optional
             If non-`nothing`, an initial template is used only when 
             it has a difference in max and min greater than its value.
         """
