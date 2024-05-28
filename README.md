@@ -20,9 +20,14 @@ A check (result screening) based on velocity change along trajectory is availabl
 ### Dimensions
 Spatial coordinates are based on array indices, with the distance between adjacent grid points always being 1, so they are non-dimensional. The velocities are based on non-dimensional spacial displacement over time difference, where, time can either be dimensional or non-dimensional.
 
-### References
+### Related packages
 * `VTTrac.jl` by Taiga Tsukada: https://github.com/tsukada-cs/VTTrac.jl (submodule of this module)
 * `VTTrac` by Takeshi Horinouchi: https://github.com/thorinouchi/VTTrac (`VTTrac.jl` were made as julia-language implementation for it)
+
+### References
+* Horinouchi, T., S. Tsujino, M. Hayashi, U. Shimada, W. Yanase, A. Wada, and H. Yamada, 2023: Stationary and Transient Asymmetric Features in Tropical Cyclone Eye with Wavenumber-1 Instability: Case Study for Typhoon Haishen (2020) with Atmospheric Motion Vectors from 30-Second Imaging. Monthly Weather Review, 151, 253–273, https://doi.org/10.1175/MWR-D-22-0179.1.
+* Tsukada, T., T. Horinouchi, and S. Tsujino, 2024: Wind Distribution in the Eye of Tropical Cyclone Revealed by a Novel Atmospheric Motion Vector Derivation. JGR Atmospheres, 129, e2023JD040585, https://doi.org/10.1029/2023JD040585.
+
 
 ## Installation and Test
 ### How to install
