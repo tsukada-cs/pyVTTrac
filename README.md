@@ -32,7 +32,7 @@ Spatial coordinates are based on array indices, with the distance between adjace
 ## Installation and Test
 ### How to install
 ```shell
-$ git clone --recurse-submodules https://github.com/tsukada-cs/pyVTTrac.git .
+$ git clone --recurse-submodules https://github.com/tsukada-cs/pyVTTrac.git
 $ cd pyVTTrac
 $ pip install .
 ```
