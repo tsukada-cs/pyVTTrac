@@ -41,6 +41,12 @@ $ pip install .
 $ pip install pytest
 $ pytest -s
 ```
+If pytest raise an error like "ERROR: Unable to load dependent library", you may need to add your library directory to the `LD_LIBRARY_PATH` envrionmental variable.
+For example, if you use anaconda3 or miniconda3, you can add the following line to your `.bashrc` for bash user or `.zshrc` for zsh user.
+```shell
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/anaconda3/lib
+```
+
 ### How to run
 ```shell
 $ python example/sample.py
