@@ -97,7 +97,7 @@ class VTT:
             Submimage x sizes.
         nsy: int
             Submimage y sizes.
-        vxch: float or None
+        vxhw: float or None
             (either `v[xy]hw` or `i[xy]hw` are MANDATORY).
             the dimensions along which to perform the computation.
             search velocity range half sizes to set `i[xy]hw`.
@@ -139,14 +139,22 @@ class VTT:
         min_samples: int, default 1
             Minimum number of visible values to calculate score when `chk_mask` is True.
         """
-
         jl.VTTrac.setup(
-                self.o, nsx, nsy,
-                vxhw=vxhw, vyhw=vyhw,
-                ixhw=ixhw, iyhw=iyhw, subgrid=subgrid, subgrid_gaus=subgrid_gaus, itstep=itstep, ntrac=ntrac, score_method=score_method,
-                Sth0=Sth0, Sth1=Sth1, vxch=vxch, vych=vych, peak_inside_th=peak_inside_th,
-                Cth=Cth, use_init_temp=use_init_temp, min_samples=min_samples
-            )
+            self.o, 
+            nsx, 
+            nsy,
+            vxhw=vxhw, vyhw=vyhw,
+            ixhw=ixhw, iyhw=iyhw, 
+            subgrid=subgrid, subgrid_gaus=subgrid_gaus, 
+            itstep=itstep, ntrac=ntrac, 
+            score_method=score_method,
+            Sth0=Sth0, Sth1=Sth1, 
+            vxch=vxch, vych=vych, 
+            peak_inside_th=peak_inside_th,
+            Cth=Cth, 
+            use_init_temp=use_init_temp, 
+            min_samples=min_samples
+        )
         
         self.attrs["dtmean"] = self.o.dtmean
         self.attrs["nsx"] = self.o.nsx
