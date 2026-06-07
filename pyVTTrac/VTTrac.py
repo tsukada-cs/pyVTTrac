@@ -125,17 +125,16 @@ class VTT:
         Sth1: float, default 0.7
             The minimum score required for subsequent tracking.
         vxch: float, optional
-            If non-`nothing`, the max tolerant vx
-            change between two consecutive tracking.
+            If specified, the max tolerant zonal velocity change between two consecutive tracking.
         vych: float, optional
-            If non-`nothing`, the max tolerant vy
-            change between two consecutive tracking.
+            If specified, the max tolerant meridional velocity change between two consecutive tracking.
         peak_inside_th: float, optional
-            If non-`nothing`, an initial template is used only when it is peaked (max or min) inside,
-            exceeding the max or min along the sides by the ratio specified by its value.
+            If specified, cloud tracking is stopped if the subimage does not have a prominent peak or trough in its interior.
+            A peak or trough is considered prominent if its value differs from the boundary 
+            extremes by more than `peak_inside_th` times the interior data range.
         Cth: float, optional
-            If non-`nothing`, an initial template is used only when 
-            it has a difference in max and min greater than its value.
+            If specified, an initial template is used only when 
+            it has a difference in max and min greater than `Cth`.
         min_samples: int, default 1
             Minimum number of visible values to calculate score when `chk_mask` is True.
         """
@@ -461,16 +460,15 @@ class VTT:
         Sth1: float, default 0.7
             The minimum score required for subsequent tracking.
         vxch: float, optional
-            If non-`nothing`, the max tolerant vx
-            change between two consecutive tracking.
+            If specified, the max tolerant zonal velocity change between two consecutive tracking.
         vych: float, optional
-            If non-`nothing`, the max tolerant vy
-            change between two consecutive tracking.
+            If specified, the max tolerant meridional velocity change between two consecutive tracking.
         peak_inside_th: float, optional
-            If non-`nothing`, an initial template is used only when it is peaked (max or min) inside,
-            exceeding the max or min along the sides by the ratio specified by its value.
+            If specified, cloud tracking is stopped if the subimage does not have a prominent peak or trough in its interior.
+            A peak or trough is considered prominent if its value differs from the boundary 
+            extremes by more than `peak_inside_th` times the interior data range.
         Cth: float, optional
-            If non-`nothing`, an initial template is used only when 
+            If specified, an initial template is used only when 
             it has a difference in max and min greater than its value.
         """
         for key in ("vxhw", "vxch"):
