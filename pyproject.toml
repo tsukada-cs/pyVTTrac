@@ -4,7 +4,7 @@ requires = ["meson-python>=0.15.0", "numpy>=1.26"]
 
 [project]
 name = "pyVTTrac"
-version = "2.1.0"
+dynamic = ["version"]  # single source of truth: meson.build's project(version: ...)
 description = "Velocimetry by template tracking (PIV/PTV-style), pure Fortran core with a NumPy-first Python API"
 readme = "README.md"
 license = { text = "BSD-2-Clause" }
@@ -33,7 +33,10 @@ Repository = "https://github.com/tsukada-cs/pyVTTrac"
 Changelog = "https://github.com/tsukada-cs/pyVTTrac/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
-xarray = ["xarray"]
+# netCDF4 is included so `TrackResult.to_xarray().to_netcdf()` works out of
+# the box -- the CF-1.13/ACDD-1.3 metadata to_xarray() adds exists mainly to
+# make that call produce a properly self-describing file.
+xarray = ["xarray", "netCDF4"]
 pandas = ["pandas"]
 test = ["pytest"]
 
