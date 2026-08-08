@@ -79,7 +79,21 @@ broadcast shape of `x0`/`y0`.
 Properties/methods:
 
 - `.ok` — bool array, `seed_shape`: `status == Status.OK`.
-- `.to_xarray()` — an `xarray.Dataset` with labeled dimensions/coordinates.
+- `.to_xarray(*, units=None, global_attrs=None)` — an `xarray.Dataset` with
+  labeled dimensions/coordinates and **CF-1.13 / ACDD-1.3 metadata**:
+  a `Conventions` global attribute, `long_name`/`units` on every variable
+  (`"1"`, i.e. dimensionless, by default), `status`'s CF `flag_values`/
+  `flag_meanings` (derived from the `Status` enum), and `_FillValue` set via
+  each variable's `.encoding` (not `.attrs`, which `Dataset.to_netcdf()`
+  rejects) so the `NaN`/`-1` sentinels round-trip through netCDF correctly.
+  `title`/`summary`/`keywords`/`source`/`history`/`date_created` are filled
+  with generic-but-accurate defaults. What it *can't* know — deployment-specific
+  ACDD discovery attributes (`institution`, `creator_name`, `license`, `id`,
+  ...) and physical units for `x`/`y`/`vx`/`vy`/`templates` when you tracked
+  with a `Grid` (`TrackResult` doesn't retain the `Grid` used) — you supply
+  via `global_attrs={"institution": ..., ...}` and
+  `units={"x": "m", "vx": "m s-1", ...}`, both merged over (and able to
+  override) the auto-generated defaults.
   The `step`/`step_v` coordinates are scaled (and, for backward tracking,
   sign-flipped) by `self.step`: `step = arange(nsteps+1) * step`,
   `step_v = arange(nsteps) * step + 0.5 * sign(step)`. Requires the optional

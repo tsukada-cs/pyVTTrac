@@ -41,6 +41,17 @@ CHANGELOG for the consumer-side details).
   `step`/`step_v` coordinates are now scaled (and sign-flipped for backward
   tracking) by it, instead of always assuming `step=1` — a backward-tracked
   result's `to_xarray()` axes now carry the correct sign/magnitude.
+- `TrackResult.to_xarray()` now annotates the returned `Dataset` with
+  **CF-1.13 / ACDD-1.3** metadata: `Conventions`, `long_name`/`units`
+  (dimensionless by default) on every variable, `status`'s `flag_values`/
+  `flag_meanings` (from the `Status` enum), `_FillValue` set via `.encoding`
+  so `NaN`/`-1` round-trip through `to_netcdf()` correctly, and
+  generic-but-accurate `title`/`summary`/`keywords`/`source`/`history`/
+  `date_created`. New optional keyword arguments `units=` and
+  `global_attrs=` let you supply what the library can't infer on its own
+  (physical units when tracking used a `Grid`; deployment-specific ACDD
+  discovery attributes like `institution`/`creator_name`/`license`).
+  Dimensional layout is unchanged, so this is non-breaking.
 
 ## 2.0.0
 

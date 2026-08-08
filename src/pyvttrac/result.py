@@ -39,7 +39,44 @@ class TrackResult:
     def ok(self) -> np.ndarray:
         return self.status == Status.OK
 
-    def to_xarray(self):
+    def to_xarray(self, *, units: Optional[dict] = None, global_attrs: Optional[dict] = None):
+        """Convert to an `xarray.Dataset` with CF-1.13 / ACDD-1.3 metadata.
+
+        The dimensional layout is unchanged from previous versions (`step`/
+        `step_v` + one dim per seed axis) -- this only adds standards-compliant
+        attributes on top, so existing code indexing the returned `Dataset`
+        keeps working.
+
+        What's filled in automatically:
+        - Global: `Conventions`, a generic-but-accurate `title`/`summary`/
+          `keywords`, `source`, `history`, `date_created`.
+        - Per variable: `long_name`, `units` (default `"1"`, i.e.
+          dimensionless/index units -- see `units` below), and `status`'s
+          CF `flag_values`/`flag_meanings` (derived from the `Status` enum).
+        - `_FillValue` is set via each variable's `.encoding` (not `.attrs`,
+          which `Dataset.to_netcdf()` requires) so NaN/-1 sentinels round-trip
+          through netCDF correctly.
+
+        What it cannot know, and you should supply for real ACDD compliance:
+        - Discovery attributes tied to *your* deployment (`institution`,
+          `creator_name`, `creator_email`, `license`, `id`,
+          `naming_authority`, `project`, ...) -- pass via `global_attrs`.
+        - Physical units for `x`/`y`/`vx`/`vy`/`templates` when you tracked in
+          physical coordinates (via `grid=`) or `z` has known units --
+          `TrackResult` doesn't retain the `Grid` used, so pass e.g.
+          `units={"x": "m", "y": "m", "vx": "m s-1", "vy": "m s-1"}`.
+          `count`/`status`/`t_index`/`score`/`step`/`step_v` are always
+          dimensionless and shouldn't need overriding.
+
+        Parameters
+        ----------
+        units : dict, optional
+            Maps variable/coordinate name -> CF/UDUNITS unit string, merged
+            over the `"1"` (dimensionless) defaults.
+        global_attrs : dict, optional
+            Extra/overriding dataset-level attributes (e.g. ACDD discovery
+            attributes), merged over the auto-generated ones.
+        """
         try:
             import xarray as xr
         except ImportError as e:
@@ -47,6 +84,10 @@ class TrackResult:
                 "TrackResult.to_xarray() requires the optional 'xarray' dependency. "
                 'Install it with `pip install "pyVTTrac[xarray]"`.'
             ) from e
+
+        from datetime import datetime, timezone
+
+        from . import __version__
 
         seed_shape = self.count.shape
         seed_dims = [f"seed_{i}" for i in range(len(seed_shape))]
@@ -73,7 +114,57 @@ class TrackResult:
                 ["step_v", "ny_search", "nx_search", *seed_dims],
                 self.score_grids,
             )
-        return xr.Dataset(data_vars=data_vars, coords=coords)
+        ds = xr.Dataset(data_vars=data_vars, coords=coords)
+
+        long_names = {
+            "count": "number of valid trajectory points, including the initial position",
+            "status": "tracking status code",
+            "t_index": "time index into the tracked data's time axis",
+            "x": "x position",
+            "y": "y position",
+            "vx": "x-component velocity between consecutive tracked points",
+            "vy": "y-component velocity between consecutive tracked points",
+            "score": "template-matching score at the tracked position",
+            "templates": "template sub-image at each tracking step",
+            "score_grids": "template-matching score over the full search window",
+            "step": "tracking step index relative to the initial position, scaled by `step`",
+            "step_v": "tracking step index at which each velocity/score applies",
+        }
+        default_units = {name: "1" for name in long_names}  # dimensionless/index units by default
+        merged_units = {**default_units, **(units or {})}
+
+        for name in ds.variables:
+            if name in long_names:
+                ds[name].attrs["long_name"] = long_names[name]
+            if name in merged_units and name != "status":  # a flag variable has no `units`
+                ds[name].attrs["units"] = merged_units[name]
+
+        ds["status"].attrs["flag_values"] = np.array([s.value for s in Status], dtype=np.int32)
+        ds["status"].attrs["flag_meanings"] = " ".join(s.name for s in Status)
+
+        ds["t_index"].encoding["_FillValue"] = -1
+        for name in ("x", "y", "vx", "vy", "score", "templates", "score_grids"):
+            if name in ds:
+                ds[name].encoding["_FillValue"] = np.nan
+
+        now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        ds.attrs.update(
+            {
+                "Conventions": "CF-1.13, ACDD-1.3",
+                "title": "Template tracking result (pyvttrac)",
+                "summary": (
+                    "Trajectories of tracked template positions and velocities produced by "
+                    "pyvttrac.track(), a PIV/PTV-style velocimetry-by-template-tracking algorithm."
+                ),
+                "keywords": "velocimetry, template tracking, PIV, PTV, trajectory",
+                "source": "pyvttrac.track()",
+                "history": f"{now}: created by pyvttrac {__version__}",
+                "date_created": now,
+            }
+        )
+        if global_attrs:
+            ds.attrs.update(global_attrs)
+        return ds
 
     def to_dataframe(self):
         """Long-format DataFrame: one row per (seed, step)."""

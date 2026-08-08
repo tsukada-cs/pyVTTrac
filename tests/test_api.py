@@ -164,6 +164,72 @@ def test_to_xarray_step_coords_reflect_negative_step():
     np.testing.assert_array_equal(ds["step_v"].values, -np.arange(nsteps) - 0.5)
 
 
+def test_to_xarray_cf_acdd_metadata():
+    pytest.importorskip("xarray")
+    import numpy as np
+
+    from pyvttrac.status import Status
+
+    z = _wave_field()
+    x0, y0 = vt.seed_grid(z.shape, spacing=8, margin=8)
+    res = vt.track(z, x0, y0, t0=0, diagnostics=True, **_common_kwargs())
+    ds = res.to_xarray()
+
+    # global (dataset-level): CF + the ACDD attributes we can genuinely infer
+    assert ds.attrs["Conventions"] == "CF-1.13, ACDD-1.3"
+    for key in ("title", "summary", "keywords", "source", "history", "date_created"):
+        assert ds.attrs.get(key), f"missing/empty global attribute {key!r}"
+
+    # every data/coord variable gets a long_name
+    for name in ds.variables:
+        assert ds[name].attrs.get("long_name"), f"{name} missing long_name"
+
+    # dimensionless by default; only `status` (a flag variable) has no `units`
+    for name in ("count", "t_index", "x", "y", "vx", "vy", "score", "step", "step_v"):
+        assert ds[name].attrs["units"] == "1"
+    assert "units" not in ds["status"].attrs
+
+    # status uses CF's flag_values/flag_meanings idiom, derived from the Status enum
+    np.testing.assert_array_equal(ds["status"].attrs["flag_values"], [s.value for s in Status])
+    assert ds["status"].attrs["flag_meanings"].split() == [s.name for s in Status]
+
+    # _FillValue belongs in .encoding (not .attrs), or Dataset.to_netcdf() rejects it
+    assert ds["t_index"].encoding["_FillValue"] == -1
+    assert np.isnan(ds["x"].encoding["_FillValue"])
+    assert "_FillValue" not in ds["t_index"].attrs
+
+
+def test_to_xarray_units_and_global_attrs_overrides():
+    pytest.importorskip("xarray")
+    z = _wave_field()
+    x0, y0 = vt.seed_grid(z.shape, spacing=8, margin=8)
+    res = vt.track(z, x0, y0, t0=0, **_common_kwargs())
+
+    ds = res.to_xarray(
+        units={"x": "m", "y": "m", "vx": "m s-1", "vy": "m s-1"},
+        global_attrs={"institution": "Example Univ.", "title": "My custom title"},
+    )
+    assert ds["x"].attrs["units"] == "m"
+    assert ds["vx"].attrs["units"] == "m s-1"
+    assert ds["score"].attrs["units"] == "1"  # untouched default
+    assert ds.attrs["institution"] == "Example Univ."
+    assert ds.attrs["title"] == "My custom title"  # override wins over the generic default
+
+
+def test_to_xarray_writes_to_netcdf(tmp_path):
+    xr = pytest.importorskip("xarray")
+    z = _wave_field()
+    x0, y0 = vt.seed_grid(z.shape, spacing=8, margin=8)
+    res = vt.track(z, x0, y0, t0=0, **_common_kwargs())
+    ds = res.to_xarray()
+
+    path = tmp_path / "result.nc"
+    ds.to_netcdf(path)
+    ds2 = xr.open_dataset(path)
+    assert ds2.attrs["Conventions"] == "CF-1.13, ACDD-1.3"
+    np.testing.assert_allclose(ds2["x"].values, ds["x"].values, equal_nan=True)
+
+
 def test_to_xarray_missing_dependency_raises_informative_error(monkeypatch):
     import builtins
 
