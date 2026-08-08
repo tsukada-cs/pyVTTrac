@@ -33,6 +33,7 @@ class TrackResult:
     score: np.ndarray
     templates: Optional[np.ndarray] = None
     score_grids: Optional[np.ndarray] = None
+    step: int = 1
 
     @property
     def ok(self) -> np.ndarray:
@@ -62,8 +63,8 @@ class TrackResult:
             score=(["step_v", *seed_dims], self.score),
         )
         coords = dict(
-            step=np.arange(nsteps + 1),
-            step_v=np.arange(nsteps) + 0.5,
+            step=np.arange(nsteps + 1) * self.step,
+            step_v=np.arange(nsteps) * self.step + 0.5 * np.sign(self.step),
         )
         if self.templates is not None:
             data_vars["templates"] = (["step", "ny_sub", "nx_sub", *seed_dims], self.templates)

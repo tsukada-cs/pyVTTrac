@@ -146,6 +146,22 @@ def test_to_xarray_shape_and_dims():
     assert ds["vx"].shape == (nsteps, *x0.shape)
     assert "templates" in ds
     assert "score_grids" in ds
+    np.testing.assert_array_equal(ds["step"].values, np.arange(nsteps + 1))
+    np.testing.assert_array_equal(ds["step_v"].values, np.arange(nsteps) + 0.5)
+
+
+def test_to_xarray_step_coords_reflect_negative_step():
+    pytest.importorskip("xarray")
+    z = _wave_field()
+    x0, y0 = vt.seed_grid(z.shape, spacing=8, margin=8)
+    tracker = vt.Tracker(**_common_kwargs())
+    res = tracker.track(z, x0, y0, t0=8, step=-1)
+    assert res.step == -1
+    ds = res.to_xarray()
+
+    nsteps = 4
+    np.testing.assert_array_equal(ds["step"].values, -np.arange(nsteps + 1))
+    np.testing.assert_array_equal(ds["step_v"].values, -np.arange(nsteps) - 0.5)
 
 
 def test_to_xarray_missing_dependency_raises_informative_error(monkeypatch):
@@ -167,6 +183,82 @@ def test_to_xarray_missing_dependency_raises_informative_error(monkeypatch):
     monkeypatch.setattr(builtins, "__import__", fake_import)
     with pytest.raises(ImportError, match="xarray"):
         res.to_xarray()
+
+
+def test_diagnostics_templates_only():
+    z = _wave_field()
+    x0, y0 = vt.seed_grid(z.shape, spacing=5, margin=8)
+    res = vt.track(z, x0, y0, t0=0, diagnostics="templates", **_common_kwargs())
+    assert res.templates is not None
+    assert res.score_grids is None
+
+
+def test_diagnostics_score_grids_only():
+    z = _wave_field()
+    x0, y0 = vt.seed_grid(z.shape, spacing=5, margin=8)
+    res = vt.track(z, x0, y0, t0=0, diagnostics="score_grids", **_common_kwargs())
+    assert res.templates is None
+    assert res.score_grids is not None
+
+
+def test_diagnostics_tuple_is_same_as_true():
+    z = _wave_field()
+    x0, y0 = vt.seed_grid(z.shape, spacing=5, margin=8)
+    kwargs = _common_kwargs()
+    res_tuple = vt.track(z, x0, y0, t0=0, diagnostics=("templates", "score_grids"), **kwargs)
+    res_true = vt.track(z, x0, y0, t0=0, diagnostics=True, **kwargs)
+    np.testing.assert_array_equal(res_tuple.templates, res_true.templates)
+    np.testing.assert_array_equal(res_tuple.score_grids, res_true.score_grids)
+
+
+def test_diagnostics_unknown_string_raises():
+    z = _wave_field(nt=6, ny=20, nx=20)
+    with pytest.raises(ValueError, match="unknown"):
+        vt.track(
+            z, np.array([10.0]), np.array([10.0]), t0=0,
+            template=(5, 5), search_velocity=(1.0, 1.0), nsteps=1,
+            diagnostics="bogus",
+        )
+
+
+def test_tracker_per_call_step_overrides_config_without_mutating_it():
+    z = _wave_field()
+    x0, y0 = vt.seed_grid(z.shape, spacing=5, margin=8)
+    tracker = vt.Tracker(**_common_kwargs())  # config.step defaults to 1
+
+    res_fwd = tracker.track(z, x0, y0, t0=4, step=1)
+    res_bwd = tracker.track(z, x0, y0, t0=4, step=-1)
+
+    assert tracker.config.step == 1  # unchanged by the per-call override
+    np.testing.assert_array_equal(res_fwd.t_index[0], 4)
+    np.testing.assert_array_equal(res_bwd.t_index[0], 4)
+    # step=+1 must only ever advance forward in time; step=-1 only backward.
+    fwd_valid = res_fwd.t_index >= 0
+    bwd_valid = res_bwd.t_index >= 0
+    assert (res_fwd.t_index[fwd_valid] >= 4).all()
+    assert (res_bwd.t_index[bwd_valid] <= 4).all()
+
+
+def test_tracker_track_step_none_uses_config_step():
+    z = _wave_field()
+    x0, y0 = vt.seed_grid(z.shape, spacing=5, margin=8)
+    tracker = vt.Tracker(**_common_kwargs(), step=1)
+
+    res_default = tracker.track(z, x0, y0, t0=0)
+    res_explicit = tracker.track(z, x0, y0, t0=0, step=None)
+    np.testing.assert_array_equal(res_default.t_index, res_explicit.t_index)
+
+
+def test_search_radius_from_velocity_matches_internal_formula():
+    # Index-unit form: matches the ceil(abs(v*dt))+1 formula `track()` uses
+    # internally when search_radius isn't given explicitly.
+    iy, ix = vt.search_radius_from_velocity((2.0, 3.0), dt=2.5)
+    assert (iy, ix) == (6, 9)  # ceil(2*2.5)+1=6, ceil(3*2.5)+1=9
+
+    # Physical-unit form via a Grid.
+    grid = vt.Grid(x0=0.0, y0=0.0, dx=2.0, dy=2.0, unit_factor=1000.0)
+    iy_g, ix_g = vt.search_radius_from_velocity((4000.0, 6000.0), dt=2.5, grid=grid)
+    assert (iy_g, ix_g) == (iy, ix)  # 4000 m/s / (2 km * 1000 m/km) = 2 index units/s
 
 
 def test_to_dataframe_missing_dependency_raises_informative_error(monkeypatch):

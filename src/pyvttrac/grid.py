@@ -13,6 +13,13 @@ class Grid:
     `calc_ixyhw_from_v_eq_grid`. Conversion formulas match those v1 methods:
     - index = (phys - origin) / spacing
     - index velocity = phys velocity / (spacing * unit_factor)
+
+    `dx`/`dy` are signed and kept as given (only zero is rejected): a
+    descending coordinate axis (e.g. latitude/`y` in many satellite products)
+    legitimately has a negative spacing, and `to_index_*`/`to_phys_*`/
+    `velocity_to_index_*`/`velocity_to_phys_*` round-trip correctly for
+    either sign. Callers that need a magnitude (e.g. a search-radius pixel
+    count) must take `abs()` themselves.
     """
 
     x0: float
@@ -24,8 +31,6 @@ class Grid:
     def __post_init__(self):
         if self.dx == 0 or self.dy == 0:
             raise ValueError("Grid.dx and Grid.dy must be non-zero")
-        object.__setattr__(self, "dx", abs(self.dx))
-        object.__setattr__(self, "dy", abs(self.dy))
 
     def to_index_x(self, x_phys):
         return (np.asarray(x_phys, dtype=np.float64) - self.x0) / self.dx

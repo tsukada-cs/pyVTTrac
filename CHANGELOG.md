@@ -1,5 +1,47 @@
 # Changelog
 
+## 2.1.0
+
+Driven by openTCAMV's migration to the v2 API (see openTCAMV's own
+CHANGELOG for the consumer-side details).
+
+### Fixed
+
+- **`Grid.dx`/`Grid.dy` sign**: previously silently coerced to `abs(dx)`/
+  `abs(dy)`, which flipped `to_index_x`/`to_index_y` for a descending
+  coordinate axis (e.g. latitude/`y` in many satellite products —
+  `Grid.from_coords([10, 9, 8, 7], ...).to_index_x(9.0)` returned `-1.0`
+  instead of `+1.0`). `dx`/`dy` are now kept signed; only zero is rejected.
+  **If you were relying on the old silent-`abs()` behavior with an
+  explicitly negative `dx`/`dy`, your index/physical mapping will now come
+  out with the opposite sign** (the previously-correct case — positive
+  `dx`/`dy`, or a `Grid` built via `from_coords`/`grid="auto"` from an
+  ascending coordinate — is unaffected).
+- **`max_velocity_change` silently disabled by a negative `Grid.dy`/`dx`**:
+  the physical-to-index conversion of a positive `max_velocity_change` came
+  out negative whenever `Grid.dy`/`dx` was negative, and the `dvy > 0 and
+  dvx > 0` gate then silently treated the check as unset. Now compared by
+  magnitude (`abs()`), as intended.
+
+### Added
+
+- `Tracker.track(..., step=...)`: per-call override of the `Tracker`'s
+  configured `step`, without needing a second `Tracker` for the opposite
+  direction (e.g. one `Tracker` for both forward and backward tracking).
+- `search_radius_from_velocity(search_velocity, dt, grid=None)`: the
+  `ceil(abs(v_index * dt)) + 1` pixel-radius formula `track()` uses
+  internally when `search_radius` isn't given, exposed for callers that need
+  it ahead of time (e.g. to size a buffer, or to derive a radius from a
+  reference `dt` other than the data's own mean spacing).
+- `diagnostics` now also accepts `"templates"` or `"score_grids"` (or a
+  tuple of the two) to populate only one of `TrackResult.templates` /
+  `.score_grids`, avoiding the other (often large) allocation. `True`/
+  `False` behave as before (both / neither).
+- `TrackResult.step`: the `step` a result was tracked with. `to_xarray()`'s
+  `step`/`step_v` coordinates are now scaled (and sign-flipped for backward
+  tracking) by it, instead of always assuming `step=1` — a backward-tracked
+  result's `to_xarray()` axes now carry the correct sign/magnitude.
+
 ## 2.0.0
 
 ### Breaking changes

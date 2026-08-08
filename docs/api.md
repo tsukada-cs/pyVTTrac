@@ -21,7 +21,7 @@ Track template patches through a `(nt, ny, nx)` image sequence. Returns a
 | `first_guess` | `(vy0, vx0)`, each broadcastable to `x0`'s shape | `None` (→ zero) | Initial velocity guess to search around, for the first step only. |
 | `missing_value` | scalar | `None` | A sentinel value in `z` treated as missing. `NaN` in `z` is *always* treated as missing as well, regardless of this setting. |
 | `grid` | `Grid`, `"auto"`, or `None` | `None` | If given, `x0`/`y0`/velocities are interpreted (and returned) in physical units — see [`Grid`](#grid). `"auto"` infers a `Grid` from an `xarray.DataArray`'s coordinates (requires `xarray`; coordinates must be equally spaced). |
-| `diagnostics` | bool | `False` | If `True`, also populate `TrackResult.templates` and `.score_grids`. |
+| `diagnostics` | `bool`, `"templates"`, `"score_grids"`, or a tuple of the latter two | `False` | Which of `TrackResult.templates`/`.score_grids` to populate. `False` = neither (default), `True` = both. A single name or `(name, ...)` populates only those, avoiding the (often large) allocation for the side you don't need. |
 
 ### Tracking-configuration arguments
 
@@ -36,7 +36,7 @@ These are the same ones `Tracker(...)` accepts, for reuse across multiple
 | `nsteps` | int | `2` | Number of tracking steps per seed. |
 | `method` | `"xcor"` \| `"ncov"` | `"xcor"` | Scoring: cross-correlation coefficient, or covariance normalized by the template's own variance. |
 | `subgrid` | `"paraboloid"` \| `"gaussian"` \| `None` | `"paraboloid"` | Subgrid peak refinement method, or `None` for integer-pixel tracking. |
-| `step` | int | `1` | Index stride between tracked frames; negative = backward tracking. Must be nonzero. |
+| `step` | int | `1` | Index stride between tracked frames; negative = backward tracking. Must be nonzero. On `Tracker.track()`, also accepted as a per-call keyword (`tracker.track(z, x0, y0, step=-1)`) that overrides the `Tracker`'s configured `step` for that call only, without mutating `tracker.config` — useful for running forward and backward tracking from one `Tracker`. |
 | `min_score` | float or `(first, subsequent)` | `(0.8, 0.7)` | Minimum score to accept a step; a scalar applies to both. |
 | `max_velocity_change` | `(dvy, dvx)` | `None` | Reject a step whose velocity differs from the previous step's by more than this, in *both* components. Only active when both components are given and positive. |
 | `min_contrast` | float | `None` | Reject a template whose `max - min` is below this. |
@@ -72,15 +72,19 @@ broadcast shape of `x0`/`y0`.
 | `x`, `y` | `(nsteps+1, *seed_shape)` | float | Tracked positions; `NaN` once invalid. |
 | `vx`, `vy` | `(nsteps, *seed_shape)` | float | Velocity between consecutive points; `NaN` where invalid. |
 | `score` | `(nsteps, *seed_shape)` | float | Match score at each step; `NaN` where invalid. |
-| `templates` | `(nsteps+1, ny, nx, *seed_shape)` or `None` | float | Sub-images along the trajectory, if `diagnostics=True`. |
-| `score_grids` | `(nsteps, 2·iy+1, 2·ix+1, *seed_shape)` or `None` | float | Full score arrays at each step, if `diagnostics=True`. |
+| `templates` | `(nsteps+1, ny, nx, *seed_shape)` or `None` | float | Sub-images along the trajectory, if requested via `diagnostics`. |
+| `score_grids` | `(nsteps, 2·iy+1, 2·ix+1, *seed_shape)` or `None` | float | Full score arrays at each step, if requested via `diagnostics`. |
+| `step` | scalar | int | The `step` this result was tracked with (config's or the per-call override). Determines the `step`/`step_v` coordinates in `to_xarray()`. |
 
 Properties/methods:
 
 - `.ok` — bool array, `seed_shape`: `status == Status.OK`.
 - `.to_xarray()` — an `xarray.Dataset` with labeled dimensions/coordinates.
-  Requires the optional `xarray` dependency; raises a clear `ImportError`
-  (mentioning `pip install "pyVTTrac[xarray]"`) if it isn't installed.
+  The `step`/`step_v` coordinates are scaled (and, for backward tracking,
+  sign-flipped) by `self.step`: `step = arange(nsteps+1) * step`,
+  `step_v = arange(nsteps) * step + 0.5 * sign(step)`. Requires the optional
+  `xarray` dependency; raises a clear `ImportError` (mentioning
+  `pip install "pyVTTrac[xarray]"`) if it isn't installed.
 - `.to_dataframe()` — a long-format `pandas.DataFrame`, one row per
   `(seed, step)`, with columns `seed, step, count, status, t_index, x, y,
   vx, vy, score` (`vx`/`vy`/`score` are `NaN` on the `step == 0` row, since
@@ -98,7 +102,7 @@ Maps between physical and index coordinates, for `track(..., grid=grid)`:
 | Field | Description |
 |---|---|
 | `x0`, `y0` | Physical-coordinate origin (where index 0 sits). |
-| `dx`, `dy` | Physical spacing per index step (stored as `abs(dx)`/`abs(dy)`; must be nonzero). |
+| `dx`, `dy` | Physical spacing per index step. **Signed** — kept as given (only zero is rejected). Use a negative `dy` (or `dx`) for a descending coordinate axis (e.g. latitude in many satellite products); `to_index_*`/`to_phys_*` round-trip correctly either way. Code that needs a magnitude (e.g. a pixel search radius) must take `abs()` itself. |
 | `unit_factor` | Unit-conversion factor applied to velocities only (e.g. seconds-per-timestep, if `dx`/`dy` are in meters and you want velocities in m/s). Default `1.0`. |
 
 Conversions: `index = (phys - origin) / spacing`;
@@ -111,6 +115,21 @@ way in, and `x`/`y`/`vx`/`vy` come back in physical units.
 equally-spaced coordinate arrays (raises `ValueError` if they aren't equally
 spaced); this is what `grid="auto"` uses under the hood for an
 `xarray.DataArray`.
+
+## `search_radius_from_velocity(search_velocity, dt, grid=None)`
+
+```python
+iy, ix = vt.search_radius_from_velocity((2.0, 2.0), dt=1.5)
+iy, ix = vt.search_radius_from_velocity((50.0, 50.0), dt=1.5, grid=grid)  # physical units
+```
+
+Pixel search radius `(iy, ix)` from a `(vy, vx)` search velocity and a
+reference time interval `dt`, using the same formula `track()` uses
+internally when `search_radius` isn't given explicitly:
+`ceil(abs(v_index * dt)) + 1`. Pass `grid` if `search_velocity` is in
+physical units; omit it for index units. Useful when you need the derived
+search radius ahead of time (e.g. to size a diagnostics buffer, or to pick a
+`dt` other than the data's own mean spacing).
 
 ## `seed_grid(shape, spacing, margin=0)`
 

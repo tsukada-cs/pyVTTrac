@@ -61,6 +61,7 @@ class Tracker:
         y0,
         t0=0,
         *,
+        step=None,
         time=None,
         mask=None,
         first_guess=None,
@@ -68,12 +69,17 @@ class Tracker:
         grid=None,
         diagnostics=False,
     ) -> TrackResult:
+        """`step=None` (default) uses the `step` this `Tracker` was configured
+        with; passing `step` here overrides it for this call only, without
+        mutating `self.config`. Useful for running forward (`step=+1`) and
+        backward (`step=-1`) tracking from a single `Tracker`."""
         return _track_impl(
             self.config,
             z,
             x0,
             y0,
             t0,
+            step=step,
             time=time,
             mask=mask,
             first_guess=first_guess,
@@ -137,6 +143,7 @@ def track(
         x0,
         y0,
         t0,
+        step=None,
         time=time,
         mask=mask,
         first_guess=first_guess,
@@ -144,6 +151,48 @@ def track(
         grid=grid,
         diagnostics=diagnostics,
     )
+
+
+def search_radius_from_velocity(search_velocity, dt, grid=None) -> "tuple[int, int]":
+    """Pixel search radius `(iy, ix)` from a `(vy, vx)` search velocity and a
+    reference time interval `dt`.
+
+    If `grid` is given, `search_velocity` is in physical units; otherwise
+    it's in index units. Same formula `track()` uses internally when
+    `search_radius` isn't given explicitly: `ceil(abs(v_index * dt)) + 1`.
+    """
+    vy, vx = search_velocity
+    if grid is not None:
+        vy = grid.velocity_to_index_y(vy)
+        vx = grid.velocity_to_index_x(vx)
+    iy = math.ceil(abs(float(vy) * dt)) + 1
+    ix = math.ceil(abs(float(vx) * dt)) + 1
+    return iy, ix
+
+
+def _parse_diagnostics(diagnostics) -> "tuple[bool, bool]":
+    """Returns `(want_templates, want_score_grids)`.
+
+    `diagnostics` accepts: `False` (neither, default), `True` (both),
+    `"templates"`, `"score_grids"`, or a tuple/list containing either or
+    both of those two strings.
+    """
+    if diagnostics is False:
+        return False, False
+    if diagnostics is True:
+        return True, True
+    if isinstance(diagnostics, str):
+        names = (diagnostics,)
+    else:
+        names = tuple(diagnostics)
+    valid = {"templates", "score_grids"}
+    unknown = set(names) - valid
+    if unknown:
+        raise ValueError(
+            f"`diagnostics` contains unknown value(s) {sorted(unknown)!r}; "
+            f"expected a subset of {sorted(valid)!r}, True, or False"
+        )
+    return "templates" in names, "score_grids" in names
 
 
 def _resolve_auto_grid(z, grid):
@@ -168,6 +217,7 @@ def _track_impl(
     y0,
     t0,
     *,
+    step,
     time,
     mask,
     first_guess,
@@ -175,6 +225,10 @@ def _track_impl(
     grid,
     diagnostics: bool,
 ) -> TrackResult:
+    effective_step = config.step if step is None else step
+    if effective_step == 0:
+        raise ValueError("`step` must not be 0")
+
     grid = _resolve_auto_grid(z, grid)
 
     z = np.asarray(z)
@@ -248,9 +302,9 @@ def _track_impl(
     if config.search_radius is not None:
         iyhw, ixhw = config.search_radius
     else:
-        dtmean = config.step * (t[-1] - t[0]) / (nt - 1)
-        ixhw = math.ceil(abs(float(svx) * dtmean)) + 1
-        iyhw = math.ceil(abs(float(svy) * dtmean)) + 1
+        iyhw, ixhw = search_radius_from_velocity(
+            (svy, svx), dt=effective_step * (t[-1] - t[0]) / (nt - 1)
+        )
 
     use_zmiss = missing_value is not None
     zmiss = np.float32(missing_value) if use_zmiss else np.float32(0.0)
@@ -285,9 +339,13 @@ def _track_impl(
     vyg_f = np.ascontiguousarray(vyg.reshape(-1), dtype=np.float64)
 
     method_code = _METHOD_CODE[config.method]
-    use_vch = dvy is not None and dvx is not None and dvy > 0 and dvx > 0
-    vxch = dvx if dvx is not None else -999.0
-    vych = dvy if dvy is not None else -999.0
+    # `max_velocity_change` is a magnitude; take abs() here rather than
+    # requiring dvy/dvx > 0, since a Grid with negative dy/dx (a descending
+    # coordinate axis) flips the sign of the physical->index conversion
+    # above even though the physical value was validated positive.
+    use_vch = dvy is not None and dvx is not None
+    vxch = abs(dvx) if dvx is not None else -999.0
+    vych = abs(dvy) if dvy is not None else -999.0
     use_peak_th = config.min_peak_prominence is not None and config.min_peak_prominence > 0
     peak_th = np.float32(config.min_peak_prominence) if use_peak_th else np.float32(-1.0)
     use_cth = config.min_contrast is not None and config.min_contrast > 0
@@ -296,32 +354,35 @@ def _track_impl(
     sth0, sth1 = config.min_score
     nsteps = config.nsteps
 
-    want = bool(diagnostics)
-    if want:
-        # Steps never reached (tracking stopped earlier) are left at these
-        # fill values, matching VTTrac.jl's `fill(o.zmiss, ...)` /
-        # `fill(Float32(o.fmiss), ...)` initial allocations exactly, so
-        # golden-data comparisons don't need to special-case unwritten
-        # regions.
+    want_templates, want_score_grids = _parse_diagnostics(diagnostics)
+    if want_templates:
+        # Steps never reached (tracking stopped earlier) are left at this
+        # fill value, matching VTTrac.jl's `fill(o.zmiss, ...)` initial
+        # allocation exactly, so golden-data comparisons don't need to
+        # special-case unwritten regions.
         zss_fill = zmiss if use_zmiss else np.float32(0.0)
         zss_buf = np.full((nsx, nsy, nsteps + 1, n), zss_fill, dtype=np.float32, order="F")
+    else:
+        # Fortran always expects a 4-D array (never indexed when want_zss is
+        # False); a minimal dummy keeps the call signature uniform.
+        zss_buf = np.zeros((1, 1, 1, 1), dtype=np.float32, order="F")
+    if want_score_grids:
         scr_buf = np.full(
             (2 * ixhw + 1, 2 * iyhw + 1, nsteps, n), np.float32(_FMISS), dtype=np.float32, order="F"
         )
     else:
-        zss_buf = np.zeros((1, 1, 1, 1), dtype=np.float32, order="F")
         scr_buf = np.zeros((1, 1, 1, 1), dtype=np.float32, order="F")
 
     nthreads = 0 if config.workers is None else int(config.workers)
 
     cnt, status, tid, xo, yo, vxo, vyo, score = _core.pyvttrac_core.track(
         zf, t, use_zmiss, zmiss, use_mask, visible_f, config.min_samples,
-        nsx, nsy, ixhw, iyhw, config.step, nsteps,
+        nsx, nsy, ixhw, iyhw, effective_step, nsteps,
         tid0_f, x0_f, y0_f, vxg_f, vyg_f,
         method_code, config.use_subgrid, config.use_gaussian_subgrid,
         sth0, sth1, use_vch, vxch, vych, use_peak_th, peak_th, use_cth, cth,
         config.fixed_template, _FMISS, _IMISS, nthreads,
-        want, zss_buf, want, scr_buf,
+        want_templates, zss_buf, want_score_grids, scr_buf,
     )
 
     t_index = np.where(tid == _IMISS, -1, tid - 1).astype(np.int64)
@@ -348,10 +409,11 @@ def _track_impl(
 
     templates = None
     score_grids = None
-    if want:
+    if want_templates:
         templates = np.ascontiguousarray(zss_buf.transpose(2, 1, 0, 3)).reshape(
             nsteps + 1, nsy, nsx, *seed_shape
         )
+    if want_score_grids:
         score_grids = np.ascontiguousarray(scr_buf.transpose(2, 1, 0, 3)).reshape(
             nsteps, 2 * iyhw + 1, 2 * ixhw + 1, *seed_shape
         )
@@ -367,4 +429,5 @@ def _track_impl(
         score=score_out,
         templates=templates,
         score_grids=score_grids,
+        step=effective_step,
     )

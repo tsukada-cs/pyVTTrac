@@ -4,7 +4,7 @@ requires = ["meson-python>=0.15.0", "numpy>=1.26"]
 
 [project]
 name = "pyVTTrac"
-version = "2.0.0"
+version = "2.1.0"
 description = "Velocimetry by template tracking (PIV/PTV-style), pure Fortran core with a NumPy-first Python API"
 readme = "README.md"
 license = { text = "BSD-2-Clause" }
