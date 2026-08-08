@@ -16,12 +16,28 @@ _core_sources = custom_target('_core_sources',
     ],
 )
 
+# `_core` mixes Fortran (core.f90, only source with `!$omp` pragmas) and C
+# (f2py's wrapper glue) sources. OpenMP must NOT be attached to the target
+# via `dependencies:` -- that applies its compile args to *every* source
+# regardless of language, including `-fopenmp` on the C files, which Apple
+# clang (the default `cc` on macOS) rejects outright ("unsupported option
+# '-fopenmp'"); plain GCC on Linux silently tolerates the same mistake,
+# which is why this only broke on macOS. Instead, add the flag only to
+# `fortran_args` (compilation) and `link_args` (the final link step, which
+# runs through gfortran because of `link_language: 'fortran'` below).
+omp_fortran_args = []
+omp_link_args = []
+if omp_dep.found()
+    omp_fortran_args = ['-fopenmp']
+    omp_link_args = ['-fopenmp']
+endif
+
 py.extension_module(
     '_core',
     [core_f90, _core_sources, incdir_f2py / 'fortranobject.c'],
-    fortran_args: fortran_args,
+    fortran_args: fortran_args + omp_fortran_args,
+    link_args: omp_link_args,
     include_directories: inc_np,
-    dependencies: omp_dep.found() ? [omp_dep] : [],
     link_language: 'fortran',
     install: true,
     subdir: 'pyvttrac',
