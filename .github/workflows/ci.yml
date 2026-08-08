@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install gfortran (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran
+
+      - name: Install gfortran (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install gcc
+
+      - name: Install pyVTTrac + test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ".[test,xarray,pandas]"
+
+      - name: Run tests
+        run: pytest -v
+
+  # Fortran core must also build (and pass its correctness/perf smoke tests)
+  # without OpenMP.
+  test-no-openmp:
+    name: test (no OpenMP)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install gfortran
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran
+
+      - name: Install pyVTTrac (OpenMP disabled) + test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "pytest" "meson-python>=0.15.0" "numpy>=1.26"
+          pip install --no-build-isolation \
+            -C setup-args=-Duse_openmp=disabled ".[xarray,pandas]"
+
+      - name: Run tests
+        run: pytest -v

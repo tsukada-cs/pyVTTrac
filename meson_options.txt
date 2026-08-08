@@ -1,0 +1,12 @@
+option(
+    'use_openmp',
+    type: 'feature',
+    value: 'auto',
+    description: 'Build the Fortran core with OpenMP parallelization over seed points',
+)
+option(
+    'native_optimization',
+    type: 'boolean',
+    value: false,
+    description: 'Enable -march=native (local builds only; breaks wheel portability)',
+)

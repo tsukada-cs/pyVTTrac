@@ -1,3 +1,56 @@
 [build-system]
-requires = ["wheel", "setuptools"]
-build-backend = "setuptools.build_meta"
+build-backend = "mesonpy"
+requires = ["meson-python>=0.15.0", "numpy>=1.26"]
+
+[project]
+name = "pyVTTrac"
+version = "2.0.0"
+description = "Velocimetry by template tracking (PIV/PTV-style), pure Fortran core with a NumPy-first Python API"
+readme = "README.md"
+license = { text = "BSD-2-Clause" }
+authors = [{ name = "Taiga Tsukada", email = "tsukada.met@gmail.com" }]
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.22"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Fortran",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
+    "Topic :: Scientific/Engineering :: Image Processing",
+]
+
+[project.urls]
+Homepage = "https://github.com/tsukada-cs/pyVTTrac"
+Repository = "https://github.com/tsukada-cs/pyVTTrac"
+Changelog = "https://github.com/tsukada-cs/pyVTTrac/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+xarray = ["xarray"]
+pandas = ["pandas"]
+test = ["pytest"]
+
+[tool.meson-python.args]
+setup = ["-Duse_openmp=auto"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.cibuildwheel]
+build = "cp310-* cp311-* cp312-* cp313-*"
+skip = "*-musllinux* *-win32 *_i686 pp*"
+test-requires = "pytest"
+test-command = "pytest {project}/tests -q"
+
+[tool.cibuildwheel.linux]
+before-all = "yum install -y gcc-gfortran || dnf install -y gcc-gfortran"
+
+[tool.cibuildwheel.macos]
+archs = ["auto"]

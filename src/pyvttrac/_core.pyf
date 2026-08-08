@@ -1,0 +1,72 @@
+!    -*- f90 -*-
+! f2py signature file for pyvttrac_core (see core.f90).
+!
+! Hand-maintained rather than auto-generated: `track` is a module procedure,
+! so it must stay nested in a `module pyvttrac_core ... end module` block
+! here (that's what tells f2py's wrapper to `use pyvttrac_core`). Kinds are
+! spelled `real*4`/`real*8` rather than `real(kind=sp)`/`real(kind=dp)`
+! because f2py's helper wrapper file (generated for the optional-argument /
+! shape-check glue) is standalone and does not `use` core.f90's
+! `iso_fortran_env` kind aliases.
+python module _core
+    interface
+        module pyvttrac_core
+            subroutine track(z,nx,ny,nt,t,use_zmiss,zmiss,use_mask,visible,min_samples,&
+                              nsx,nsy,ixhw,iyhw,itstep,nsteps,n,tid0,x0,y0,vx0,vy0,&
+                              method,subgrid,subgrid_gaus,sth0,sth1,use_vch,vxch,vych,&
+                              use_peak_th,peak_th,use_cth,cth,fixed_template,fmiss,imiss,nthreads,&
+                              cnt,status,tid,xo,yo,vxo,vyo,score,want_zss,zss,want_scr,scr_ary)
+                real*4 dimension(nx,ny,nt),intent(in) :: z
+                integer, optional,intent(in),check(shape(z,0)==nx),depend(z) :: nx=shape(z,0)
+                integer, optional,intent(in),check(shape(z,1)==ny),depend(z) :: ny=shape(z,1)
+                integer, optional,intent(in),check(shape(z,2)==nt),depend(z) :: nt=shape(z,2)
+                real*8 dimension(nt),intent(in),depend(nt) :: t
+                logical intent(in) :: use_zmiss
+                real*4 intent(in) :: zmiss
+                logical intent(in) :: use_mask
+                logical dimension(nx,ny,nt),intent(in),depend(nx,ny,nt) :: visible
+                integer intent(in) :: min_samples
+                integer intent(in) :: nsx
+                integer intent(in) :: nsy
+                integer intent(in) :: ixhw
+                integer intent(in) :: iyhw
+                integer intent(in) :: itstep
+                integer intent(in) :: nsteps
+                integer, optional,intent(in),check(shape(tid0,0)==n),depend(tid0) :: n=shape(tid0,0)
+                integer dimension(n),intent(in) :: tid0
+                real*8 dimension(n),intent(in),depend(n) :: x0
+                real*8 dimension(n),intent(in),depend(n) :: y0
+                real*8 dimension(n),intent(in),depend(n) :: vx0
+                real*8 dimension(n),intent(in),depend(n) :: vy0
+                integer intent(in) :: method
+                logical intent(in) :: subgrid
+                logical intent(in) :: subgrid_gaus
+                real*8 intent(in) :: sth0
+                real*8 intent(in) :: sth1
+                logical intent(in) :: use_vch
+                real*8 intent(in) :: vxch
+                real*8 intent(in) :: vych
+                logical intent(in) :: use_peak_th
+                real*4 intent(in) :: peak_th
+                logical intent(in) :: use_cth
+                real*4 intent(in) :: cth
+                logical intent(in) :: fixed_template
+                real*8 intent(in) :: fmiss
+                integer intent(in) :: imiss
+                integer intent(in) :: nthreads
+                integer dimension(n),intent(out),depend(n) :: cnt
+                integer dimension(n),intent(out),depend(n) :: status
+                integer dimension(1 + nsteps,n),intent(out),depend(nsteps,n) :: tid
+                real*8 dimension(1 + nsteps,n),intent(out),depend(nsteps,n) :: xo
+                real*8 dimension(1 + nsteps,n),intent(out),depend(nsteps,n) :: yo
+                real*8 dimension(nsteps,n),intent(out),depend(nsteps,n) :: vxo
+                real*8 dimension(nsteps,n),intent(out),depend(nsteps,n) :: vyo
+                real*8 dimension(nsteps,n),intent(out),depend(nsteps,n) :: score
+                logical intent(in) :: want_zss
+                real*4 dimension(:,:,:,:),intent(inout) :: zss
+                logical intent(in) :: want_scr
+                real*4 dimension(:,:,:,:),intent(inout) :: scr_ary
+            end subroutine track
+        end module pyvttrac_core
+    end interface
+end python module _core
