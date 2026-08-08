@@ -37,6 +37,12 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install gcc
+          # Homebrew's gcc formula only installs version-suffixed binaries
+          # (gfortran-NN, no unversioned `gfortran`), so meson's compiler
+          # autodetection needs to be pointed at it explicitly via FC.
+          FC_PATH=$(ls "$(brew --prefix gcc)/bin"/gfortran-* | head -n 1)
+          echo "Using gfortran at: ${FC_PATH}"
+          echo "FC=${FC_PATH}" >> "$GITHUB_ENV"
 
       - name: Install pyVTTrac + test dependencies
         run: |

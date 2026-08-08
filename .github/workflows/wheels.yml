@@ -19,7 +19,16 @@ jobs:
 
       - name: Install gfortran (macOS)
         if: runner.os == 'macOS'
-        run: brew install gcc
+        run: |
+          brew install gcc
+          # Homebrew's gcc formula only installs version-suffixed binaries
+          # (gfortran-NN, no unversioned `gfortran`), so meson's compiler
+          # autodetection needs to be pointed at it explicitly via FC. This
+          # must reach cibuildwheel's build subprocess too, hence CIBW_ENVIRONMENT.
+          FC_PATH=$(ls "$(brew --prefix gcc)/bin"/gfortran-* | head -n 1)
+          echo "Using gfortran at: ${FC_PATH}"
+          echo "FC=${FC_PATH}" >> "$GITHUB_ENV"
+          echo "CIBW_ENVIRONMENT_MACOS=FC=${FC_PATH}" >> "$GITHUB_ENV"
 
       - uses: pypa/cibuildwheel@v2.21
         env:
