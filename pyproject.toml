@@ -51,6 +51,10 @@ test-command = "pytest {project}/tests -q"
 
 [tool.cibuildwheel.linux]
 before-all = "yum install -y gcc-gfortran || dnf install -y gcc-gfortran"
+# manylinux2014's stock GCC (10.2) is too old to build NumPy's own build
+# dependencies (NumPy requires GCC >= 10.3); manylinux_2_28 ships a
+# modern-enough toolchain out of the box.
+manylinux-x86_64-image = "manylinux_2_28"
 
 [tool.cibuildwheel.macos]
 archs = ["auto"]

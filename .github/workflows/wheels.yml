@@ -28,13 +28,28 @@ jobs:
           FC_PATH=$(ls "$(brew --prefix gcc)/bin"/gfortran-* | head -n 1)
           echo "Using gfortran at: ${FC_PATH}"
           echo "FC=${FC_PATH}" >> "$GITHUB_ENV"
-          echo "CIBW_ENVIRONMENT_MACOS=FC=${FC_PATH}" >> "$GITHUB_ENV"
+
+          CIBW_ENV="FC=${FC_PATH}"
+          if [ "$(uname -m)" = "arm64" ]; then
+            # Homebrew's arm64 bottles for gcc/gfortran's runtime (libgfortran,
+            # libgomp, libquadmath) are themselves built requiring a newer
+            # minimum macOS than cibuildwheel's default arm64 target (11.0),
+            # which makes `delocate-wheel` refuse to repair the wheel. Match
+            # the target macOS requires; bump this if a future runner image
+            # reports a different "minimum target" in the delocate error.
+            CIBW_ENV="${CIBW_ENV} MACOSX_DEPLOYMENT_TARGET=14.0"
+          fi
+          echo "CIBW_ENVIRONMENT_MACOS=${CIBW_ENV}" >> "$GITHUB_ENV"
 
       - uses: pypa/cibuildwheel@v2.21
         env:
           CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-*"
           CIBW_SKIP: "*-musllinux* *-win32 *_i686 pp*"
           CIBW_ARCHS_MACOS: "auto"
+          # manylinux2014's stock GCC (10.2) is too old to build NumPy's own
+          # build dependencies (NumPy requires GCC >= 10.3); manylinux_2_28
+          # ships a modern-enough toolchain out of the box.
+          CIBW_MANYLINUX_X86_64_IMAGE: "manylinux_2_28"
           CIBW_BEFORE_ALL_LINUX: "yum install -y gcc-gfortran || dnf install -y gcc-gfortran"
           CIBW_TEST_REQUIRES: "pytest"
           CIBW_TEST_COMMAND: "pytest {project}/tests -q"
