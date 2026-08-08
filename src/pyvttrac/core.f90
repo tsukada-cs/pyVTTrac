@@ -124,14 +124,21 @@ contains
     real(sp) :: tmpl_diag(nsx, nsy)
     logical :: ok, need_read, peak_failed, vchange_failed
     integer :: nvis
+    integer :: nthr
 
     fmiss_sp = real(fmiss, sp)
 
+    ! Resolved locally rather than via omp_set_num_threads(), which would
+    ! mutate process-wide OpenMP state and leak into unrelated track() calls
+    ! (and other OpenMP-using libraries) for the rest of the process lifetime.
+    nthr = 1
 #ifdef _OPENMP
     if (nthreads > 0) then
-      call omp_set_num_threads(nthreads)
+      nthr = nthreads
     else if (nthreads < 0) then
-      call omp_set_num_threads(omp_get_num_procs())
+      nthr = omp_get_num_procs()
+    else
+      nthr = omp_get_max_threads()
     end if
 #endif
 
@@ -153,7 +160,13 @@ contains
     tid(2:nsteps + 1, :) = imiss
     vxo = fmiss; vyo = fmiss; score = fmiss
 
-    !$omp parallel do default(shared) schedule(dynamic) &
+    !$omp parallel do default(none) schedule(dynamic) num_threads(nthr) &
+    !$omp   shared(z, nx, ny, nt, t, use_zmiss, zmiss, use_mask, visible, min_samples, &
+    !$omp          nsx, nsy, ixhw, iyhw, itstep, nsteps, n, tid0, vx0, vy0, &
+    !$omp          method, subgrid, subgrid_gaus, sth0, sth1, use_vch, vxch, vych, &
+    !$omp          use_peak_th, peak_th, use_cth, cth, fixed_template, imiss, fmiss, &
+    !$omp          fmiss_sp, cnt, status, tid, xo, yo, vxo, vyo, score, &
+    !$omp          want_zss, zss, want_scr, scr_ary) &
     !$omp   private(m, j, tidf, tidl, kc, lc, xcur, ycur, vxg, vyg, dtt, xw, yw, &
     !$omp           vxw, vyw, kpi_r, lpi_r, peak_r, sth, tmpl, xd, sigx, vis_tmpl, &
     !$omp           scr, tmpl_diag, ok, need_read, peak_failed, vchange_failed, nvis)
@@ -341,8 +354,8 @@ contains
 
     x0i = xi - nsx / 2
     y0i = yi - nsy / 2
-    ok = .not. (x0i < 1 .or. x0i + nsx - 1 + abs(isx) > nx .or. &
-                y0i < 1 .or. y0i + nsy - 1 + abs(isy) > ny)
+    ok = .not. (x0i + min(0, isx) < 1 .or. x0i + nsx - 1 + abs(isx) > nx .or. &
+                y0i + min(0, isy) < 1 .or. y0i + nsy - 1 + abs(isy) > ny)
     if (.not. ok) return
 
     if (use_zmiss) then
@@ -396,8 +409,8 @@ contains
 
     x0i = xi - nsx / 2
     y0i = yi - nsy / 2
-    ok = .not. (x0i < 1 .or. x0i + nsx - 1 + abs(isx) > nx .or. &
-                y0i < 1 .or. y0i + nsy - 1 + abs(isy) > ny)
+    ok = .not. (x0i + min(0, isx) < 1 .or. x0i + nsx - 1 + abs(isx) > nx .or. &
+                y0i + min(0, isy) < 1 .or. y0i + nsy - 1 + abs(isy) > ny)
     if (.not. ok) return
 
     if (use_zmiss) then

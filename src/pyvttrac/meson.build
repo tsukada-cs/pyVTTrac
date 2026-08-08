@@ -46,6 +46,7 @@ py.extension_module(
 python_sources = [
     '__init__.py',
     'api.py',
+    'bidirectional.py',
     'config.py',
     'grid.py',
     'result.py',

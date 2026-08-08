@@ -8,6 +8,7 @@ import pytest
 import pyvttrac as vt
 from pyvttrac.config import TrackingConfig
 from pyvttrac.grid import Grid
+from pyvttrac.status import Status
 
 
 def _small_z(nt=6, ny=20, nx=20):
@@ -145,3 +146,74 @@ def test_grid_dx_dy_must_be_nonzero():
         Grid(x0=0.0, y0=0.0, dx=0.0, dy=1.0)
     with pytest.raises(ValueError):
         Grid(x0=0.0, y0=0.0, dx=1.0, dy=0.0)
+
+
+# ---------------------------------------------------------------------------
+# Template-read boundary handling: a seed whose subgrid-interpolation stencil
+# leans toward the domain's low edge (fractional part < 0, so the bilinear
+# stencil needs one extra column/row *below* the template's own footprint)
+# must be rejected like any other out-of-range template, not read past the
+# array's start.
+# ---------------------------------------------------------------------------
+
+
+def _edge_marker_z(nt=4, ny=20, nx=20):
+    z = np.zeros((nt, ny, nx), dtype=np.float32)
+    z[:, :, -1] = 1000.0  # distinctive value at the far (right/bottom) edge
+    return z
+
+
+def test_low_edge_subpixel_seed_x_is_rejected_not_corrupted():
+    z = _edge_marker_z()
+    # 0-based x=1.9 -> fractional part < 0 after rounding -> stencil reaches
+    # for the column left of the template's own left edge.
+    res = vt.track(
+        z, np.array([1.9]), np.array([10.0]), t0=0,
+        template=(5, 5), search_radius=(2, 2), nsteps=1,
+        first_guess=(np.array([0.0]), np.array([5.0])),
+        min_score=(-2.0, -2.0), diagnostics="templates",
+    )
+    assert res.status[0] == Status.TEMPLATE_READ_FAILED
+    # The far-edge marker must never appear in this template: if it does,
+    # the read wrapped around the array instead of being rejected.
+    assert not np.any(res.templates[0, :, :, 0] == 1000.0)
+
+
+def test_low_edge_subpixel_seed_y_is_rejected_not_corrupted():
+    z = _edge_marker_z()
+    res = vt.track(
+        z, np.array([10.0]), np.array([1.9]), t0=0,
+        template=(5, 5), search_radius=(2, 2), nsteps=1,
+        first_guess=(np.array([5.0]), np.array([0.0])),
+        min_score=(-2.0, -2.0), diagnostics="templates",
+    )
+    assert res.status[0] == Status.TEMPLATE_READ_FAILED
+    assert not np.any(res.templates[0, :, :, 0] == 1000.0)
+
+
+def test_low_edge_subpixel_seed_is_rejected_with_mask_too():
+    # read_template_visible() has the same stencil-vs-bounds-check shape as
+    # read_template(); exercise it via a mask that doesn't otherwise reject.
+    z = _edge_marker_z()
+    mask = np.zeros(z.shape, dtype=bool)
+    res = vt.track(
+        z, np.array([1.9]), np.array([10.0]), t0=0,
+        template=(5, 5), search_radius=(2, 2), nsteps=1,
+        first_guess=(np.array([0.0]), np.array([5.0])),
+        min_score=(-2.0, -2.0), mask=mask, min_samples=1,
+    )
+    assert res.status[0] == Status.TEMPLATE_READ_FAILED
+
+
+def test_integer_seed_at_same_edge_is_unaffected():
+    # Sanity check: an integer-valued seed at the same nominal position
+    # (no subpixel stencil, isx == 0) is a legitimate in-bounds read and
+    # must keep succeeding -- the boundary fix must not overcorrect.
+    z = _edge_marker_z()
+    res = vt.track(
+        z, np.array([2.0]), np.array([10.0]), t0=0,
+        template=(5, 5), search_radius=(2, 2), nsteps=1,
+        first_guess=(np.array([0.0]), np.array([5.0])),
+        min_score=(-2.0, -2.0),
+    )
+    assert res.status[0] != Status.TEMPLATE_READ_FAILED

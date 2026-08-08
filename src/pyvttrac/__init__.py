@@ -1,6 +1,7 @@
 from importlib.metadata import PackageNotFoundError, version as _version
 
-from .api import Tracker, search_radius_from_velocity, track
+from .api import Tracker, search_radius_from_velocity, track, velocity_from_search_radius
+from .bidirectional import concat_bidirectional
 from .grid import Grid
 from .result import TrackResult
 from .seeds import seed_grid
@@ -25,5 +26,7 @@ __all__ = [
     "Status",
     "seed_grid",
     "search_radius_from_velocity",
+    "velocity_from_search_radius",
+    "concat_bidirectional",
     "__version__",
 ]

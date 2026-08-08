@@ -10,3 +10,9 @@ option(
     value: false,
     description: 'Enable -march=native (local builds only; breaks wheel portability)',
 )
+option(
+    'debug_bounds_check',
+    type: 'boolean',
+    value: false,
+    description: 'Enable gfortran runtime array-bounds checking (-fcheck=bounds -fbacktrace); CI/debug use only, not for release wheels (slow)',
+)

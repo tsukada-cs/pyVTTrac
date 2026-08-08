@@ -78,3 +78,34 @@ jobs:
 
       - name: Run tests
         run: pytest -v
+
+  # gfortran's runtime array-bounds checking only fires with -fcheck=bounds,
+  # which release wheels never enable (too slow). This is the only CI job
+  # that can catch an out-of-bounds Fortran array access before it ships as
+  # silent memory corruption in a release build.
+  test-bounds-check:
+    name: test (debug, bounds-checked)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install gfortran
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran
+
+      - name: Install pyVTTrac (debug, bounds-checked) + test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "pytest" "meson-python>=0.15.0" "numpy>=1.26"
+          pip install --no-build-isolation \
+            -C setup-args=-Dbuildtype=debug \
+            -C setup-args=-Ddebug_bounds_check=true \
+            ".[xarray,pandas]"
+
+      - name: Run tests
+        run: pytest -v

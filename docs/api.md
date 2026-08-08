@@ -75,6 +75,11 @@ broadcast shape of `x0`/`y0`.
 | `templates` | `(nsteps+1, ny, nx, *seed_shape)` or `None` | float | Sub-images along the trajectory, if requested via `diagnostics`. |
 | `score_grids` | `(nsteps, 2·iy+1, 2·ix+1, *seed_shape)` or `None` | float | Full score arrays at each step, if requested via `diagnostics`. |
 | `step` | scalar | int | The `step` this result was tracked with (config's or the per-call override). Determines the `step`/`step_v` coordinates in `to_xarray()`. |
+| `grid` | scalar | `Grid` or `None` | The `Grid` used, if any (`None` if tracking was done in index units). |
+| `seed_x`, `seed_y` | `seed_shape` | float or `None` | The seed positions as passed to `track()`, in whatever units `x0`/`y0` were given (physical units when `grid` is set). |
+| `search_radius` | scalar | `(iy, ix)` or `None` | The pixel search radius actually used (whether given directly or derived from `search_velocity`). |
+| `status_forward`, `status_backward` | `seed_shape` | int or `None` | Set only on a `concat_bidirectional()` result: each leg's own `status`. `None` on an ordinary result. |
+| `step_offset` | scalar | int | Index, along the position axis, of the origin (step 0). `0` for an ordinary result; set by `concat_bidirectional()`. Feeds into `to_xarray()`'s `step`/`step_v` coordinates -- you shouldn't need to touch this directly. |
 
 Properties/methods:
 
@@ -87,18 +92,26 @@ Properties/methods:
   each variable's `.encoding` (not `.attrs`, which `Dataset.to_netcdf()`
   rejects) so the `NaN`/`-1` sentinels round-trip through netCDF correctly.
   `title`/`summary`/`keywords`/`source`/`history`/`date_created` are filled
-  with generic-but-accurate defaults. What it *can't* know — deployment-specific
-  ACDD discovery attributes (`institution`, `creator_name`, `license`, `id`,
-  ...) and physical units for `x`/`y`/`vx`/`vy`/`templates` when you tracked
-  with a `Grid` (`TrackResult` doesn't retain the `Grid` used) — you supply
-  via `global_attrs={"institution": ..., ...}` and
-  `units={"x": "m", "vx": "m s-1", ...}`, both merged over (and able to
-  override) the auto-generated defaults.
-  The `step`/`step_v` coordinates are scaled (and, for backward tracking,
-  sign-flipped) by `self.step`: `step = arange(nsteps+1) * step`,
-  `step_v = arange(nsteps) * step + 0.5 * sign(step)`. Requires the optional
-  `xarray` dependency; raises a clear `ImportError` (mentioning
-  `pip install "pyVTTrac[xarray]"`) if it isn't installed.
+  with generic-but-accurate defaults. If `self.grid` is set and has
+  `x_units`/`y_units`/`velocity_units`, those become the default `units` for
+  `x`/`y` and `vx`/`vy` respectively (an explicit `units=` entry still wins).
+  If `self.seed_x`/`self.seed_y` are set, they're added as `seed_x`/`seed_y`
+  coordinates -- a 1-D axis per dimension (`("seed_1",)`/`("seed_0",)`) when
+  they come from a separable `seed_grid()`-style grid, otherwise a single
+  auxiliary coordinate spanning all seed dimensions.
+  What it still *can't* know — deployment-specific ACDD discovery attributes
+  (`institution`, `creator_name`, `license`, `id`, ...) — you supply via
+  `global_attrs={"institution": ..., ...}`; both `units=` and `global_attrs=`
+  are merged over (and can override) the auto-generated defaults.
+  The `step`/`step_v` coordinates are scaled by `self.step` and shifted by
+  `self.step_offset` (`0` except on a `concat_bidirectional()` result):
+  `step = (arange(nsteps+1) - step_offset) * step`,
+  `step_v = (arange(nsteps) - step_offset) * step + 0.5 * sign(step)` --
+  for an ordinary (non-combined) result this is unchanged from before
+  (`step_offset` is always `0`), including the sign-flip for backward
+  tracking. Requires the optional `xarray` dependency; raises a clear
+  `ImportError` (mentioning `pip install "pyVTTrac[xarray]"`) if it isn't
+  installed.
 - `.to_dataframe()` — a long-format `pandas.DataFrame`, one row per
   `(seed, step)`, with columns `seed, step, count, status, t_index, x, y,
   vx, vy, score` (`vx`/`vy`/`score` are `NaN` on the `step == 0` row, since
@@ -118,6 +131,7 @@ Maps between physical and index coordinates, for `track(..., grid=grid)`:
 | `x0`, `y0` | Physical-coordinate origin (where index 0 sits). |
 | `dx`, `dy` | Physical spacing per index step. **Signed** — kept as given (only zero is rejected). Use a negative `dy` (or `dx`) for a descending coordinate axis (e.g. latitude in many satellite products); `to_index_*`/`to_phys_*` round-trip correctly either way. Code that needs a magnitude (e.g. a pixel search radius) must take `abs()` itself. |
 | `unit_factor` | Unit-conversion factor applied to velocities only (e.g. seconds-per-timestep, if `dx`/`dy` are in meters and you want velocities in m/s). Default `1.0`. |
+| `x_units`, `y_units`, `velocity_units` | Optional unit strings (e.g. `"m"`, `"degrees_east"`, `"m s-1"`). Pure metadata — never affect any conversion or validation here; used only as `TrackResult.to_xarray()`'s default `units` for `x`/`y` and `vx`/`vy`. |
 
 Conversions: `index = (phys - origin) / spacing`;
 `index_velocity = phys_velocity / (spacing * unit_factor)` (and their
@@ -125,9 +139,11 @@ inverses). When `grid` is given, `x0`/`y0`/`search_velocity`/
 `max_velocity_change`/`first_guess` are interpreted in physical units on the
 way in, and `x`/`y`/`vx`/`vy` come back in physical units.
 
-`Grid.from_coords(x_coord, y_coord)` infers a `Grid` from two 1-D,
-equally-spaced coordinate arrays (raises `ValueError` if they aren't equally
-spaced); this is what `grid="auto"` uses under the hood for an
+`Grid.from_coords(x_coord, y_coord, *, x_units=None, y_units=None,
+velocity_units=None)` infers a `Grid` from two 1-D, equally-spaced
+coordinate arrays (raises `ValueError` if they aren't equally spaced),
+optionally tagged with the same unit metadata as the `Grid` constructor;
+this is what `grid="auto"` uses under the hood for an
 `xarray.DataArray`.
 
 ## `search_radius_from_velocity(search_velocity, dt, grid=None)`
@@ -144,6 +160,61 @@ internally when `search_radius` isn't given explicitly:
 physical units; omit it for index units. Useful when you need the derived
 search radius ahead of time (e.g. to size a diagnostics buffer, or to pick a
 `dt` other than the data's own mean spacing).
+
+## `velocity_from_search_radius(search_radius, dt, grid=None)`
+
+```python
+vy, vx = vt.velocity_from_search_radius((6, 9), dt=1.5)
+```
+
+The (approximate) inverse of `search_radius_from_velocity()`: the `(vy, vx)`
+velocity magnitude a given pixel search radius `(iy, ix)` is guaranteed to
+cover, for a reference time interval `dt` (`(radius - 1) / abs(dt)`, the
+same convention v1 pyVTTrac used in `set_ixyhw_directly`). Not an exact
+inverse, since `search_radius_from_velocity()`'s `ceil()` loses information
+— the round trip `search_radius_from_velocity` → `velocity_from_search_radius`
+returns a value `>=` the original. Always non-negative, and unaffected by
+`dt`'s sign: a search radius alone carries no direction. Pass `grid` to get
+the result in physical units. Useful for recovering an equivalent search
+velocity to log/report (v1 exposed `vxhw`/`vyhw` directly; v2's
+`search_radius`-first design doesn't retain them).
+
+## `concat_bidirectional(forward, backward, *, drop_shared_origin=True)`
+
+```python
+tracker = vt.Tracker(template=(7, 7), search_velocity=(2.0, 2.0), nsteps=5)
+fwd = tracker.track(z, x0, y0, t0=10, step=1)
+bwd = tracker.track(z, x0, y0, t0=10, step=-1)
+combined = vt.concat_bidirectional(fwd, bwd)
+```
+
+Combines a forward- and backward-tracked `TrackResult` from a **shared
+origin** (same `t0`/`x0`/`y0`) into one `TrackResult` spanning both
+directions. Only this shared-origin case is supported — `forward.step > 0`,
+`backward.step < 0`, equal magnitude, matching seed shapes, and
+`forward.t_index[0] == backward.t_index[0]`; anything else raises
+`ValueError`. Seeds whose forward/backward legs start at different times
+must be combined by the caller.
+
+The combined position axis (`t_index`/`x`/`y`/`templates`) runs from
+`-len(backward.vx)` to `+len(forward.vx)` steps (`to_xarray()`'s `step`/
+`step_v` coordinates reflect this automatically, via `step_offset`).
+Velocities are **not** sign-flipped when reversing the backward leg — `vx =
+(xw - xcur) / dt` already comes out correctly signed when `dt < 0`, so only
+the array order changes.
+
+- `status` is `Status.OK` only if both legs completed OK; otherwise
+  whichever leg's status is not OK (`forward`'s, if both failed). Each
+  leg's own status survives separately as `status_forward`/
+  `status_backward`.
+- `count` is the number of valid (`t_index != -1`) points on the combined
+  position axis.
+- `grid`/`seed_x`/`seed_y`/`search_radius` carry over only when `forward`
+  and `backward` agree; otherwise `None`.
+- `diagnostics` (`templates`/`score_grids`) must be present on both legs or
+  neither, with matching non-step-axis shapes.
+- `drop_shared_origin=True` (default) records the shared starting point
+  once; `False` keeps both legs' own copy of it (one array element longer).
 
 ## `seed_grid(shape, spacing, margin=0)`
 

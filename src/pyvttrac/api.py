@@ -170,6 +170,31 @@ def search_radius_from_velocity(search_velocity, dt, grid=None) -> "tuple[int, i
     return iy, ix
 
 
+def velocity_from_search_radius(search_radius, dt, grid=None) -> "tuple[float, float]":
+    """`(vy, vx)` search velocity magnitude that a given pixel search radius
+    `(iy, ix)` is guaranteed to cover, for a reference time interval `dt`.
+
+    Not an exact inverse of `search_radius_from_velocity()` -- its `ceil()`
+    loses information -- so this returns `(radius - 1) / abs(dt)`: the
+    largest index velocity magnitude that would have produced a radius no
+    bigger than the one given (same `(ixhw - 1) / dtmean` convention v1
+    pyVTTrac used in `set_ixyhw_directly`). Always non-negative: a search
+    radius alone carries no direction, only a magnitude bound. `dt`'s sign
+    doesn't matter either, for the same reason.
+
+    If `grid` is given, the returned velocity is converted to physical
+    units; otherwise it's in index units.
+    """
+    iy, ix = search_radius
+    dt = abs(float(dt))
+    vy = (iy - 1) / dt
+    vx = (ix - 1) / dt
+    if grid is not None:
+        vy = abs(float(grid.velocity_to_phys_y(vy)))
+        vx = abs(float(grid.velocity_to_phys_x(vx)))
+    return vy, vx
+
+
 def _parse_diagnostics(diagnostics) -> "tuple[bool, bool]":
     """Returns `(want_templates, want_score_grids)`.
 
@@ -430,4 +455,8 @@ def _track_impl(
         templates=templates,
         score_grids=score_grids,
         step=effective_step,
+        grid=grid if use_grid else None,
+        seed_x=x0,
+        seed_y=y0,
+        search_radius=(iyhw, ixhw),
     )

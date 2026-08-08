@@ -1,5 +1,68 @@
 # Changelog
 
+## 2.2.0
+
+Practical ergonomics from real usage: less boilerplate wiring physical units
+and seed coordinates through to `to_xarray()`, and a helper for the common
+forward+backward tracking pattern. All additions; nothing removed or
+renamed.
+
+### Fixed
+
+- **Out-of-bounds template read at the low edge of the domain**: the
+  Fortran core's array-bounds check for a seed's subgrid-interpolation
+  stencil assumed the stencil always extended in the `+x`/`+y` direction,
+  missing the case where it extends in the `-x`/`-y` direction instead
+  (a seed whose position rounds down, i.e. a negative fractional offset).
+  In a debug build this aborted with a Fortran runtime error; in a release
+  build it silently read one element before the start of `z`'s row —
+  which, due to Fortran's column-major layout, wraps to the end of the
+  previous row rather than crashing — corrupting the affected template
+  (and everything downstream: contrast/peak-prominence screening, score,
+  and reported velocity) with unrelated data instead of failing with
+  `Status.TEMPLATE_READ_FAILED` as intended.
+- **OpenMP thread count no longer sticky across `track()` calls**: thread
+  count was previously set via `omp_set_num_threads()`, which mutates
+  process-wide OpenMP state. Calling `track(..., workers=2)` and then later
+  `track(..., workers=None)` silently kept using 2 threads instead of
+  returning to the OpenMP default. `workers` is now resolved into a
+  per-call `num_threads()` clause on the parallel region instead, so it no
+  longer leaks between calls (or into other OpenMP-using libraries in the
+  same process).
+
+### Added
+
+- `Grid` gains optional `x_units`/`y_units`/`velocity_units` string fields
+  (e.g. `"m"`, `"degrees_east"`, `"m s-1"`). Pure metadata — never affect any
+  conversion — used by `to_xarray()` as the default `units` for `x`/`y` and
+  `vx`/`vy` when tracking used that `Grid`. `Grid.from_coords()` accepts the
+  same keywords.
+- `TrackResult` now records how it was produced: `grid` (the `Grid` used, or
+  `None`), `seed_x`/`seed_y` (the seed positions as passed to `track()`,
+  in whatever units `x0`/`y0` were given), and `search_radius` (the actual
+  `(iy, ix)` pixel radius used, whether given directly or derived from
+  `search_velocity`).
+- `TrackResult.to_xarray()` uses the above automatically: `x`/`y`/`vx`/`vy`
+  default to the `Grid`'s units instead of always `"1"`, and `seed_x`/
+  `seed_y` are added as coordinates (a 1-D axis per dimension for a
+  separable `seed_grid()`-style grid, otherwise a full auxiliary
+  coordinate). An explicit `units=` entry still overrides.
+- `velocity_from_search_radius(search_radius, dt, grid=None)`: recovers an
+  equivalent search velocity magnitude from a pixel search radius (the v1
+  `set_ixyhw_directly` convention: `(radius - 1) / abs(dt)`), for logging/
+  diagnostics that want to report a velocity scale.
+- `concat_bidirectional(forward, backward, *, drop_shared_origin=True)`:
+  combines a forward- and backward-tracked `TrackResult` sharing the same
+  origin (`t0`/`x0`/`y0`) into one trajectory. Velocities are **not**
+  sign-flipped when reversing the backward leg (`vx = (xw - xcur) / dt` is
+  already correctly signed when `dt < 0`) — only previously-hand-rolled
+  stitching code needed to get this right. `TrackResult` gains
+  `status_forward`/`status_backward` (each leg's own status; `None` unless
+  produced this way) and `step_offset` (the position-axis index of the
+  origin, `0` on an ordinary result, feeding `to_xarray()`'s `step`/
+  `step_v` coordinates so a combined result's axes come out correctly
+  centered at `0`).
+
 ## 2.1.0
 
 Driven by openTCAMV's migration to the v2 API (see openTCAMV's own

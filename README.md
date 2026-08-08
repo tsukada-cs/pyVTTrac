@@ -73,6 +73,8 @@ code table.
 - **Multi-step tracking**: each seed is tracked for `nsteps` steps of `step`
   frames each (`step` can be negative, for backward tracking), carrying the
   previous step's velocity forward as the next search center.
+  `vt.concat_bidirectional()` stitches a forward and a backward run from the
+  same starting point into one trajectory.
 - **Screening**: `min_score` (first step vs. subsequent steps), an optional
   `max_velocity_change` trajectory-consistency check, an optional
   `min_contrast` template check, and an optional `min_peak_prominence`

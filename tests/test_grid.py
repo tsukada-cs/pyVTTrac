@@ -127,3 +127,46 @@ def test_from_coords_rejects_non_equally_spaced():
 def test_from_coords_requires_at_least_two_points():
     with pytest.raises(ValueError):
         Grid.from_coords(np.array([1.0]), np.array([0.0, 1.0]))
+
+
+def test_units_default_to_none():
+    grid = Grid(x0=0.0, y0=0.0, dx=2.0, dy=2.0)
+    assert grid.x_units is None
+    assert grid.y_units is None
+    assert grid.velocity_units is None
+
+
+def test_units_do_not_affect_conversions():
+    plain = Grid(x0=10.0, y0=-5.0, dx=2.0, dy=-3.0, unit_factor=1000.0)
+    labeled = Grid(
+        x0=10.0, y0=-5.0, dx=2.0, dy=-3.0, unit_factor=1000.0,
+        x_units="m", y_units="degrees_north", velocity_units="m s-1",
+    )
+
+    x_index = np.array([0.0, 1.5, -2.0])
+    y_index = np.array([0.0, -1.5, 5.0])
+    v_index = np.array([0.0, 3.0, -4.0])
+
+    np.testing.assert_array_equal(plain.to_phys_x(x_index), labeled.to_phys_x(x_index))
+    np.testing.assert_array_equal(plain.to_phys_y(y_index), labeled.to_phys_y(y_index))
+    np.testing.assert_array_equal(plain.to_index_x(x_index), labeled.to_index_x(x_index))
+    np.testing.assert_array_equal(plain.to_index_y(y_index), labeled.to_index_y(y_index))
+    np.testing.assert_array_equal(
+        plain.velocity_to_phys_x(v_index), labeled.velocity_to_phys_x(v_index)
+    )
+    np.testing.assert_array_equal(
+        plain.velocity_to_phys_y(v_index), labeled.velocity_to_phys_y(v_index)
+    )
+
+
+def test_from_coords_passes_through_units():
+    grid = Grid.from_coords(
+        x_coord=np.array([0.0, 1.0, 2.0]),
+        y_coord=np.array([10.0, 9.0, 8.0]),
+        x_units="m",
+        y_units="degrees_north",
+        velocity_units="m s-1",
+    )
+    assert grid.x_units == "m"
+    assert grid.y_units == "degrees_north"
+    assert grid.velocity_units == "m s-1"

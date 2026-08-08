@@ -118,6 +118,55 @@ def test_tracker_and_track_agree():
         np.testing.assert_array_equal(getattr(res_tracker, name), getattr(res_direct, name))
 
 
+def test_result_provenance_without_grid():
+    z = _wave_field()
+    x0, y0 = vt.seed_grid(z.shape, spacing=8, margin=8)
+    res = vt.track(z, x0, y0, t0=0, **_common_kwargs())
+
+    assert res.grid is None
+    np.testing.assert_array_equal(res.seed_x, x0)
+    np.testing.assert_array_equal(res.seed_y, y0)
+
+
+def test_result_provenance_with_grid():
+    from pyvttrac.grid import Grid
+
+    z = _wave_field()
+    grid = Grid(x0=100.0, y0=-50.0, dx=2.0, dy=2.0)
+    x0_idx, y0_idx = vt.seed_grid(z.shape, spacing=8, margin=8)
+    x0_phys, y0_phys = grid.to_phys_x(x0_idx), grid.to_phys_y(y0_idx)
+
+    res = vt.track(z, x0_phys, y0_phys, t0=0, grid=grid, **_common_kwargs())
+
+    assert res.grid == grid
+    # seed_x/seed_y are kept in physical units (as passed in), not index units
+    np.testing.assert_allclose(res.seed_x, x0_phys)
+    np.testing.assert_allclose(res.seed_y, y0_phys)
+    assert not np.allclose(res.seed_x, x0_idx)
+
+
+def test_result_search_radius_explicit():
+    z = _wave_field()
+    x0, y0 = vt.seed_grid(z.shape, spacing=8, margin=8)
+    res = vt.track(
+        z, x0, y0, t0=0, template=(7, 7), search_radius=(3, 4), nsteps=2,
+    )
+    assert res.search_radius == (3, 4)
+
+
+def test_result_search_radius_derived_from_velocity():
+    z = _wave_field()
+    x0, y0 = vt.seed_grid(z.shape, spacing=8, margin=8)
+    nt = z.shape[0]
+    t = np.arange(nt, dtype=np.float64)
+    step = 1  # matches _common_kwargs()'s implicit default
+    dt = step * (t[-1] - t[0]) / (nt - 1)
+    expected = vt.search_radius_from_velocity((2.0, 2.0), dt=dt)
+
+    res = vt.track(z, x0, y0, t0=0, time=t, **_common_kwargs())
+    assert res.search_radius == expected
+
+
 def test_to_dataframe_shape_and_columns():
     pytest.importorskip("pandas")
     z = _wave_field()
@@ -230,6 +279,92 @@ def test_to_xarray_writes_to_netcdf(tmp_path):
     np.testing.assert_allclose(ds2["x"].values, ds["x"].values, equal_nan=True)
 
 
+def test_to_xarray_separable_seed_grid_gets_1d_coords():
+    pytest.importorskip("xarray")
+    z = _wave_field()
+    x0, y0 = vt.seed_grid(z.shape, spacing=8, margin=8)
+    res = vt.track(z, x0, y0, t0=0, **_common_kwargs())
+    ds = res.to_xarray()
+
+    assert ds["seed_x"].dims == ("seed_1",)
+    assert ds["seed_y"].dims == ("seed_0",)
+    np.testing.assert_allclose(ds["seed_x"].values, x0[0, :])
+    np.testing.assert_allclose(ds["seed_y"].values, y0[:, 0])
+
+
+def test_to_xarray_scattered_1d_seed_gets_auxiliary_coord():
+    pytest.importorskip("xarray")
+    z = _wave_field()
+    rng = np.random.RandomState(0)
+    x0 = rng.uniform(15, 45, size=6)
+    y0 = rng.uniform(15, 45, size=6)
+    res = vt.track(z, x0, y0, t0=0, **_common_kwargs())
+    ds = res.to_xarray()
+
+    assert ds["seed_x"].dims == ("seed_0",)
+    assert ds["seed_y"].dims == ("seed_0",)
+    np.testing.assert_allclose(ds["seed_x"].values, x0)
+
+
+def test_to_xarray_non_separable_2d_seed_gets_full_auxiliary_coord():
+    pytest.importorskip("xarray")
+    z = _wave_field()
+    # each row has independent x values -> not expressible as a 1-D x axis
+    x0 = np.array([[15.0, 20.0], [16.0, 25.0]])
+    y0 = np.array([[15.0, 15.0], [25.0, 25.0]])
+    res = vt.track(z, x0, y0, t0=0, **_common_kwargs())
+    ds = res.to_xarray()
+
+    assert ds["seed_x"].dims == ("seed_0", "seed_1")
+    assert ds["seed_y"].dims == ("seed_0", "seed_1")
+    np.testing.assert_allclose(ds["seed_x"].values, x0)
+
+
+def test_to_xarray_units_from_grid():
+    pytest.importorskip("xarray")
+    from pyvttrac.grid import Grid
+
+    z = _wave_field()
+    grid = Grid(x0=0.0, y0=0.0, dx=2.0, dy=2.0, x_units="m", y_units="m", velocity_units="m s-1")
+    x0_idx, y0_idx = vt.seed_grid(z.shape, spacing=8, margin=8)
+    x0, y0 = grid.to_phys_x(x0_idx), grid.to_phys_y(y0_idx)
+
+    res = vt.track(z, x0, y0, t0=0, grid=grid, **_common_kwargs())
+    ds = res.to_xarray()
+
+    assert ds["x"].attrs["units"] == "m"
+    assert ds["y"].attrs["units"] == "m"
+    assert ds["vx"].attrs["units"] == "m s-1"
+    assert ds["vy"].attrs["units"] == "m s-1"
+    assert ds["seed_x"].attrs["units"] == "m"
+    assert ds["seed_y"].attrs["units"] == "m"
+    assert ds["score"].attrs["units"] == "1"  # untouched
+
+
+def test_to_xarray_explicit_units_override_grid_units():
+    pytest.importorskip("xarray")
+    from pyvttrac.grid import Grid
+
+    z = _wave_field()
+    grid = Grid(x0=0.0, y0=0.0, dx=2.0, dy=2.0, x_units="m")
+    x0_idx, y0_idx = vt.seed_grid(z.shape, spacing=8, margin=8)
+    x0, y0 = grid.to_phys_x(x0_idx), grid.to_phys_y(y0_idx)
+
+    res = vt.track(z, x0, y0, t0=0, grid=grid, **_common_kwargs())
+    ds = res.to_xarray(units={"x": "km"})
+    assert ds["x"].attrs["units"] == "km"
+
+
+def test_to_xarray_without_grid_units_stay_dimensionless():
+    pytest.importorskip("xarray")
+    z = _wave_field()
+    x0, y0 = vt.seed_grid(z.shape, spacing=8, margin=8)
+    res = vt.track(z, x0, y0, t0=0, **_common_kwargs())
+    ds = res.to_xarray()
+    for name in ("x", "y", "vx", "vy"):
+        assert ds[name].attrs["units"] == "1"
+
+
 def test_to_xarray_missing_dependency_raises_informative_error(monkeypatch):
     import builtins
 
@@ -325,6 +460,38 @@ def test_search_radius_from_velocity_matches_internal_formula():
     grid = vt.Grid(x0=0.0, y0=0.0, dx=2.0, dy=2.0, unit_factor=1000.0)
     iy_g, ix_g = vt.search_radius_from_velocity((4000.0, 6000.0), dt=2.5, grid=grid)
     assert (iy_g, ix_g) == (iy, ix)  # 4000 m/s / (2 km * 1000 m/km) = 2 index units/s
+
+
+def test_velocity_from_search_radius_roundtrip_is_at_least_original():
+    for v in ((2.0, 3.0), (0.4, 0.05), (7.9, 1.0)):
+        for dt in (2.5, -2.5, 1.0):
+            radius = vt.search_radius_from_velocity(v, dt=dt)
+            v_back = vt.velocity_from_search_radius(radius, dt=dt)
+            assert v_back[0] >= abs(v[0]) - 1e-9
+            assert v_back[1] >= abs(v[1]) - 1e-9
+
+
+def test_velocity_from_search_radius_is_never_negative():
+    # a search radius carries no direction; dt's sign must not leak through
+    vy1, vx1 = vt.velocity_from_search_radius((6, 9), dt=2.5)
+    vy2, vx2 = vt.velocity_from_search_radius((6, 9), dt=-2.5)
+    assert vy1 == vy2 >= 0
+    assert vx1 == vx2 >= 0
+
+
+def test_velocity_from_search_radius_with_grid():
+    grid = vt.Grid(x0=0.0, y0=0.0, dx=2.0, dy=2.0, unit_factor=1000.0)
+    vy_idx, vx_idx = vt.velocity_from_search_radius((6, 9), dt=2.5)
+    vy_phys, vx_phys = vt.velocity_from_search_radius((6, 9), dt=2.5, grid=grid)
+    assert vy_phys == pytest.approx(vy_idx * 2.0 * 1000.0)
+    assert vx_phys == pytest.approx(vx_idx * 2.0 * 1000.0)
+
+
+def test_velocity_from_search_radius_matches_v1_convention():
+    # v1 pyVTTrac's set_ixyhw_directly: vxhw = (ixhw - 1) / dtmean
+    vy, vx = vt.velocity_from_search_radius((6, 9), dt=2.5)
+    assert vy == pytest.approx((6 - 1) / 2.5)
+    assert vx == pytest.approx((9 - 1) / 2.5)
 
 
 def test_to_dataframe_missing_dependency_raises_informative_error(monkeypatch):

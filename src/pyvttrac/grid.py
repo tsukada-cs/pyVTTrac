@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
 
@@ -20,6 +21,11 @@ class Grid:
     `velocity_to_index_*`/`velocity_to_phys_*` round-trip correctly for
     either sign. Callers that need a magnitude (e.g. a search-radius pixel
     count) must take `abs()` themselves.
+
+    `x_units`/`y_units`/`velocity_units` are plain metadata (e.g. `"m"`,
+    `"degrees_east"`, `"m s-1"`): they never affect any conversion here, and
+    are not validated. `TrackResult.to_xarray()` uses them, when present, as
+    the default `units` attribute for `x`/`y`/`vx`/`vy`.
     """
 
     x0: float
@@ -27,6 +33,9 @@ class Grid:
     dx: float
     dy: float
     unit_factor: float = 1.0
+    x_units: Optional[str] = None
+    y_units: Optional[str] = None
+    velocity_units: Optional[str] = None
 
     def __post_init__(self):
         if self.dx == 0 or self.dy == 0:
@@ -57,13 +66,28 @@ class Grid:
         return np.asarray(vy_index, dtype=np.float64) * self.dy * self.unit_factor
 
     @staticmethod
-    def from_coords(x_coord, y_coord) -> "Grid":
+    def from_coords(
+        x_coord,
+        y_coord,
+        *,
+        x_units: Optional[str] = None,
+        y_units: Optional[str] = None,
+        velocity_units: Optional[str] = None,
+    ) -> "Grid":
         """Infer a Grid from 1-D, equally-spaced coordinate arrays (used by `grid="auto"`)."""
         x_coord = np.asarray(x_coord, dtype=np.float64)
         y_coord = np.asarray(y_coord, dtype=np.float64)
         dx = _uniform_step(x_coord, "x")
         dy = _uniform_step(y_coord, "y")
-        return Grid(x0=float(x_coord[0]), y0=float(y_coord[0]), dx=dx, dy=dy)
+        return Grid(
+            x0=float(x_coord[0]),
+            y0=float(y_coord[0]),
+            dx=dx,
+            dy=dy,
+            x_units=x_units,
+            y_units=y_units,
+            velocity_units=velocity_units,
+        )
 
 
 def _uniform_step(coord: np.ndarray, axis_name: str) -> float:
