@@ -12,7 +12,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-13, macos-14]
+        # macos-13 (Intel) intentionally omitted: GitHub's Intel macOS runner
+        # pool has been unreliable (observed 3+ hour queues with no runner
+        # ever assigned) and Intel Mac share keeps shrinking since Apple
+        # Silicon's 2020 transition. Users without an arm64 wheel available
+        # still get a working install via the sdist fallback (needs
+        # gfortran, e.g. `brew install gcc`). Revisit if runner availability
+        # improves or x86_64 macOS demand shows up.
+        os: [ubuntu-latest, macos-14]
 
     steps:
       - uses: actions/checkout@v4
