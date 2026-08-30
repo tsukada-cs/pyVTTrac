@@ -37,6 +37,7 @@ module pyvttrac_core
   integer, parameter :: ST_PEAK_NOT_FOUND = 7
   integer, parameter :: ST_SCORE_BELOW_THRESHOLD = 8
   integer, parameter :: ST_VELOCITY_CHANGE_TOO_LARGE = 9
+  integer, parameter :: ST_SCORE_MARGIN_TOO_SMALL = 10
 
   integer, parameter :: METHOD_XCOR = 0
   integer, parameter :: METHOD_NCOV = 1
@@ -55,6 +56,7 @@ contains
        n, tid0, x0, y0, vx0, vy0, &
        method, subgrid, subgrid_gaus, &
        sth0, sth1, use_vch, vxch, vych, use_peak_th, peak_th, use_cth, cth, &
+       use_mth, mth, &
        fixed_template, &
        fmiss, imiss, nthreads, &
        cnt, status, tid, xo, yo, vxo, vyo, score, &
@@ -93,6 +95,8 @@ contains
     real(sp), intent(in) :: peak_th
     logical, intent(in) :: use_cth
     real(sp), intent(in) :: cth
+    logical, intent(in) :: use_mth
+    real(sp), intent(in) :: mth
     logical, intent(in) :: fixed_template
 
     ! -- missing-value sentinels & threading ------------------------------------
@@ -116,7 +120,7 @@ contains
     ! -- locals (thread-private via OpenMP `private` clause below) --------------
     integer :: m, j, tidf, tidl, kc, lc
     real(dp) :: xcur, ycur, vxg, vyg, dtt, xw, yw, vxw, vyw
-    real(dp) :: kpi_r, lpi_r, peak_r, sth
+    real(dp) :: kpi_r, lpi_r, peak_r, margin_r, sth
     real(sp) :: fmiss_sp
     real(sp) :: tmpl(nsx, nsy), xd(nsx, nsy), sigx
     logical :: vis_tmpl(nsx, nsy)
@@ -164,11 +168,11 @@ contains
     !$omp   shared(z, nx, ny, nt, t, use_zmiss, zmiss, use_mask, visible, min_samples, &
     !$omp          nsx, nsy, ixhw, iyhw, itstep, nsteps, n, tid0, vx0, vy0, &
     !$omp          method, subgrid, subgrid_gaus, sth0, sth1, use_vch, vxch, vych, &
-    !$omp          use_peak_th, peak_th, use_cth, cth, fixed_template, imiss, fmiss, &
+    !$omp          use_peak_th, peak_th, use_cth, cth, use_mth, mth, fixed_template, imiss, fmiss, &
     !$omp          fmiss_sp, cnt, status, tid, xo, yo, vxo, vyo, score, &
     !$omp          want_zss, zss, want_scr, scr_ary) &
     !$omp   private(m, j, tidf, tidl, kc, lc, xcur, ycur, vxg, vyg, dtt, xw, yw, &
-    !$omp           vxw, vyw, kpi_r, lpi_r, peak_r, sth, tmpl, xd, sigx, vis_tmpl, &
+    !$omp           vxw, vyw, kpi_r, lpi_r, peak_r, margin_r, sth, tmpl, xd, sigx, vis_tmpl, &
     !$omp           scr, tmpl_diag, ok, need_read, peak_failed, vchange_failed, nvis)
     do m = 1, n
       do j = 1, nsteps
@@ -267,10 +271,22 @@ contains
         if (want_scr) scr_ary(:, :, j, m) = scr
 
         call find_score_peak(scr, 2 * ixhw + 1, 2 * iyhw + 1, subgrid, subgrid_gaus, &
-             kpi_r, lpi_r, peak_r, ok)
+             kpi_r, lpi_r, peak_r, margin_r, ok)
         if (.not. ok) then
           status(m) = ST_PEAK_NOT_FOUND
           exit
+        end if
+
+        ! Ridge screening: on quasi-1-D texture (streaks, wave striations) the
+        ! score surface is a ridge running to the edge of the search window;
+        ! the along-ridge displacement is then ill-determined even though the
+        ! peak itself is high. Require the interior peak to stand above the
+        ! best boundary score by a margin, in score units.
+        if (use_mth) then
+          if (margin_r < real(mth, dp)) then
+            status(m) = ST_SCORE_MARGIN_TOO_SMALL
+            exit
+          end if
         end if
 
         if (j == 1) then
@@ -691,15 +707,15 @@ contains
   ! status/count on ties and break golden-data parity), then optional 5-point
   ! subgrid refinement. Mirrors VTTrac.jl's find_score_peak.
   !===========================================================================
-  subroutine find_score_peak(scr, nk, nl, do_subgrid, use_gaussian, kpi, lpi, peak, ok)
+  subroutine find_score_peak(scr, nk, nl, do_subgrid, use_gaussian, kpi, lpi, peak, margin, ok)
     integer, intent(in) :: nk, nl
     real(sp), intent(in) :: scr(nk, nl)
     logical, intent(in) :: do_subgrid, use_gaussian
-    real(dp), intent(out) :: kpi, lpi, peak
+    real(dp), intent(out) :: kpi, lpi, peak, margin
     logical, intent(out) :: ok
 
     integer :: ii, jj, ipi, jpi
-    real(sp) :: best
+    real(sp) :: best, bnd
     real(dp) :: c, ld, rd, bd, td, kp, lp
     logical :: sub_stat
 
@@ -714,6 +730,7 @@ contains
       end do
     end do
 
+    margin = 0.0_dp
     if (ipi == 0) then
       ok = .false.
       kpi = 0.0_dp; lpi = 0.0_dp; peak = 0.0_dp
@@ -724,6 +741,24 @@ contains
     if (.not. ok) then
       kpi = 0.0_dp; lpi = 0.0_dp; peak = 0.0_dp
       return
+    end if
+
+    ! Margin of the (grid) peak over the best score on the search-window
+    ! boundary; the subgrid refinement below does not enter, so the margin is
+    ! a property of the raw score surface.
+    bnd = -huge(bnd)
+    do ii = 1, nk
+      if (.not. ieee_is_nan(scr(ii, 1))) bnd = max(bnd, scr(ii, 1))
+      if (.not. ieee_is_nan(scr(ii, nl))) bnd = max(bnd, scr(ii, nl))
+    end do
+    do jj = 2, nl - 1
+      if (.not. ieee_is_nan(scr(1, jj))) bnd = max(bnd, scr(1, jj))
+      if (.not. ieee_is_nan(scr(nk, jj))) bnd = max(bnd, scr(nk, jj))
+    end do
+    if (bnd > -huge(bnd)) then
+      margin = real(best, dp) - real(bnd, dp)
+    else
+      margin = huge(1.0_dp)  ! fully masked boundary cannot veto an interior peak
     end if
 
     kpi = real(ipi, dp)

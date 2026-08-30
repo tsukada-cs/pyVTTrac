@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **`min_score_margin`** (`track()` / `Tracker`): ridge screening on the
+  cross-correlation surface. On quasi-1-D texture (streaks, wave striations)
+  the score surface is a ridge running to the edge of the search window, so
+  the along-ridge displacement is ill-determined even though the peak score
+  is high -- `min_score` cannot catch this (the tracker's score is high
+  precisely because the whole ridge correlates). A step is now rejected with
+  the new `Status.SCORE_MARGIN_TOO_SMALL` (10) when the interior score peak
+  does not exceed the best score on the search-window boundary by the given
+  margin (score units; the raw grid surface, independent of subgrid
+  refinement; a fully masked boundary cannot veto an interior peak).
+  Default `None` keeps behavior bit-identical to 2.2.0.
+
 ## 2.2.0
 
 Practical ergonomics from real usage: less boilerplate wiring physical units

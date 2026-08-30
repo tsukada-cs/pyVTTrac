@@ -41,6 +41,7 @@ These are the same ones `Tracker(...)` accepts, for reuse across multiple
 | `max_velocity_change` | `(dvy, dvx)` | `None` | Reject a step whose velocity differs from the previous step's by more than this, in *both* components. Only active when both components are given and positive. |
 | `min_contrast` | float | `None` | Reject a template whose `max - min` is below this. |
 | `min_peak_prominence` | float | `None` | Reject a template with no sufficiently prominent interior peak/trough (needs `template` >= 3 in both dimensions). |
+| `min_score_margin` | float | `None` | Reject a step whose score peak does not stand above the best score on the search-window boundary by at least this much (score units). Screens quasi-1-D texture (streaks, wave striations), where the score surface is a ridge and the along-ridge displacement is ill-determined even though the peak score is high. |
 | `fixed_template` | bool | `False` | Keep matching against the *initial* template throughout the trajectory, instead of re-reading a fresh template at each step. |
 | `min_samples` | int | `1` | Minimum number of jointly-visible (unmasked) pixels required to compute a score, when `mask` is given. |
 | `workers` | int | `None` | OpenMP threads used to parallelize across seeds: `None` (OpenMP default / `OMP_NUM_THREADS`), `-1` (all cores), or a specific count. |
@@ -245,6 +246,7 @@ status integers), so numeric comparisons keep working across versions.
 | 7 | `PEAK_NOT_FOUND` | No valid score peak, or the peak sits on the edge of the search window. |
 | 8 | `SCORE_BELOW_THRESHOLD` | Peak score below `min_score` (first component for step 1, second for later steps). |
 | 9 | `VELOCITY_CHANGE_TOO_LARGE` | Velocity change along the trajectory exceeded `max_velocity_change`. |
+| 10 | `SCORE_MARGIN_TOO_SMALL` | Score peak failed the `min_score_margin` ridge screening. |
 
 ## Input validation
 
@@ -254,6 +256,7 @@ silently misbehaving) for, among others:
 - `z` not 3-dimensional, or fewer than 2 time steps.
 - `mask` shape not matching `z`.
 - `template` components < 1, or < 3 when `min_peak_prominence` is set.
+- `min_score_margin` < 0.
 - `method` not `"xcor"`/`"ncov"`; `subgrid` not a valid choice.
 - Neither, or both, of `search_velocity`/`search_radius` given.
 - `x0`/`y0` shape mismatch; `t0` or `time` shape mismatch.

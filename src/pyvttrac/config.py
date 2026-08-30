@@ -48,6 +48,7 @@ class TrackingConfig:
     max_velocity_change: Optional[Pair] = None  # (dvy, dvx)
     min_contrast: Optional[float] = None
     min_peak_prominence: Optional[float] = None
+    min_score_margin: Optional[float] = None
     fixed_template: bool = False
     min_samples: int = 1
     workers: Optional[int] = None
@@ -75,6 +76,8 @@ class TrackingConfig:
             raise ValueError(
                 "`template` sizes must each be >= 3 when `min_peak_prominence` is set"
             )
+        if self.min_score_margin is not None and self.min_score_margin < 0:
+            raise ValueError("`min_score_margin` must be >= 0")
         if self.method not in ("xcor", "ncov"):
             raise ValueError('`method` must be "xcor" or "ncov"')
         if self.subgrid not in ("paraboloid", "gaussian", None):

@@ -14,7 +14,7 @@ python module _core
             subroutine track(z,nx,ny,nt,t,use_zmiss,zmiss,use_mask,visible,min_samples,&
                               nsx,nsy,ixhw,iyhw,itstep,nsteps,n,tid0,x0,y0,vx0,vy0,&
                               method,subgrid,subgrid_gaus,sth0,sth1,use_vch,vxch,vych,&
-                              use_peak_th,peak_th,use_cth,cth,fixed_template,fmiss,imiss,nthreads,&
+                              use_peak_th,peak_th,use_cth,cth,use_mth,mth,fixed_template,fmiss,imiss,nthreads,&
                               cnt,status,tid,xo,yo,vxo,vyo,score,want_zss,zss,want_scr,scr_ary)
                 real*4 dimension(nx,ny,nt),intent(in) :: z
                 integer, optional,intent(in),check(shape(z,0)==nx),depend(z) :: nx=shape(z,0)
@@ -50,6 +50,8 @@ python module _core
                 real*4 intent(in) :: peak_th
                 logical intent(in) :: use_cth
                 real*4 intent(in) :: cth
+                logical intent(in) :: use_mth
+                real*4 intent(in) :: mth
                 logical intent(in) :: fixed_template
                 real*8 intent(in) :: fmiss
                 integer intent(in) :: imiss

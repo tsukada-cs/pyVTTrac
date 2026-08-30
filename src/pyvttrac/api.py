@@ -33,6 +33,7 @@ class Tracker:
         max_velocity_change=None,
         min_contrast=None,
         min_peak_prominence=None,
+        min_score_margin=None,
         fixed_template=False,
         min_samples=1,
         workers=None,
@@ -49,6 +50,7 @@ class Tracker:
             max_velocity_change=max_velocity_change,
             min_contrast=min_contrast,
             min_peak_prominence=min_peak_prominence,
+            min_score_margin=min_score_margin,
             fixed_template=fixed_template,
             min_samples=min_samples,
             workers=workers,
@@ -108,6 +110,7 @@ def track(
     max_velocity_change=None,
     min_contrast=None,
     min_peak_prominence=None,
+    min_score_margin=None,
     fixed_template=False,
     min_samples=1,
     first_guess=None,
@@ -133,6 +136,7 @@ def track(
         max_velocity_change=max_velocity_change,
         min_contrast=min_contrast,
         min_peak_prominence=min_peak_prominence,
+        min_score_margin=min_score_margin,
         fixed_template=fixed_template,
         min_samples=min_samples,
         workers=workers,
@@ -375,6 +379,8 @@ def _track_impl(
     peak_th = np.float32(config.min_peak_prominence) if use_peak_th else np.float32(-1.0)
     use_cth = config.min_contrast is not None and config.min_contrast > 0
     cth = np.float32(config.min_contrast) if use_cth else np.float32(-1.0)
+    use_mth = config.min_score_margin is not None and config.min_score_margin > 0
+    mth = np.float32(config.min_score_margin) if use_mth else np.float32(-1.0)
 
     sth0, sth1 = config.min_score
     nsteps = config.nsteps
@@ -406,6 +412,7 @@ def _track_impl(
         tid0_f, x0_f, y0_f, vxg_f, vyg_f,
         method_code, config.use_subgrid, config.use_gaussian_subgrid,
         sth0, sth1, use_vch, vxch, vych, use_peak_th, peak_th, use_cth, cth,
+        use_mth, mth,
         config.fixed_template, _FMISS, _IMISS, nthreads,
         want_templates, zss_buf, want_score_grids, scr_buf,
     )
